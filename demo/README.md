@@ -1,4 +1,4 @@
-# 💡 IdeaForge AI 
+# 💡 OlivIA Ideas 
 
 Plataforma inteligente que utiliza IA para transformar ideias iniciais em projetos estruturados, auxiliando na validação e tomada de decisão.
 
