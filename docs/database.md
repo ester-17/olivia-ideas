@@ -53,7 +53,7 @@ Essa abordagem busca reduzir a necessidade de alterações frequentes no esquema
 │      users      │
 ├─────────────────┤
 │ PK id           │
-│ name            │
+│ user_name       │
 │ email           │
 │ password_hash   │
 │ created_at      │
