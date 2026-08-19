@@ -44,14 +44,14 @@ CREATE TABLE idea_5w2h (
     why TEXT,
     why_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
 
+    who TEXT,
+    who_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+
     where_location TEXT,
     where_location_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
 
     when_info TEXT,
     when_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
-
-    who TEXT,
-    who_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
 
     how TEXT,
     how_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
