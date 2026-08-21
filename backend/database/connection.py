@@ -18,8 +18,8 @@ class DatabaseConnection:
     database cursors, and commit or rollback active transactions.
     """
 
-    def __init__(self) -> None:
-        self._connection: mysql.connector.MySQLConnection | None = None
+    def __init__(self):
+        self._connection = None
 
     def create_connection(self) -> "mysql.connector.MySQLConnection":
         """
@@ -44,14 +44,14 @@ class DatabaseConnection:
 
         return self._connection
     
-    def get_cursor(self) -> mysql.connector.cursor.MySQLCursor:
+    def get_cursor(self):
         """
         Returns a cursor for executing SQL commands.
         """
         connection = self.create_connection()
         return connection.cursor(dictionary=True)
 
-    def close_cursor(self, cursor: mysql.connector.cursor.MySQLCursor | None) -> None:
+    def close_cursor(self, cursor) -> None:
         """
         Closes an active database cursor.
         
