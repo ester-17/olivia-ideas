@@ -41,12 +41,12 @@ st.markdown(
 st.markdown(
     """Uma plataforma inteligente que ajuda você a sair do **"tenho uma ideia"** para um plano claro e validado.
 
-    Insira sua ideia e receba uma análise estruturada com apoio de IA, incluindo:
-    - **Definição de público-alvo**
-    - **Organização com metodologia 5W2H**
-    - **Sugestões de próximos passos práticos**
+Insira sua ideia e receba uma análise estruturada com apoio de IA, incluindo:
+- **Definição de público-alvo**
+- **Organização com metodologia 5W2H**
+- **Sugestões de próximos passos práticos**
 
-    Você pode gerenciar todo o ciclo das suas ideias: criar, editar, listar e excluir facilmente.""")
+Você pode gerenciar todo o ciclo das suas ideias: criar, editar, listar e excluir facilmente.""")
 
 st.divider()
 

@@ -95,13 +95,13 @@ class IdeaRepository:
         sql = """
             INSERT INTO idea_5w2h(
                 idea_id, what, why, where_location,
-                who, when_info, how, how_much
+                when_info, who, how, how_much
             )
             VALUES(%s, %s, %s, %s, %s, %s, %s, %s)
             """
         values = (
-            idea_id,     data["what"],      data["why"], data["where_location"],
-            data["who"], data["when_info"], data["how"], data["how_much"],
+            idea_id,      data["what"],data["why"], data["where"],
+            data["when"], data["who"], data["how"], data["how_much"],
         )
         cursor.execute(sql, values)
 

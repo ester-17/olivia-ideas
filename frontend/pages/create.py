@@ -25,7 +25,7 @@ FIELDS = [
 def configure_page():
 
     st.set_page_config(
-        page_title="OlivIA Ideias",
+        page_title="OlivIA Ideas",
         page_icon="🧠",
         layout="centered"
     )
@@ -240,7 +240,7 @@ def main():
     st.divider()
 
     if st.button(
-        "🚀 Criar ideia",
+        "Criar ideia",
         use_container_width=True
     ):
 

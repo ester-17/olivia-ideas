@@ -37,7 +37,7 @@ class IdeaService:
         show_report = options["show_report"]
 
         # 2. Save idea
-        idea_id = self.repository.create_idea(payload["idea"])
+        idea_id = self.repository.create(payload["idea"])
 
         # 3. AI
         report = None
