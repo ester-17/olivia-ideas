@@ -1,6 +1,6 @@
 # Development
 
-## 📚 Sobre o desenvolvimento
+## Sobre o desenvolvimento
 
 O OlivIA Ideas começou como um projeto experimental para explorar o uso de Inteligência Artificial na estruturação de ideias.
 
@@ -35,7 +35,7 @@ Essa evolução permitiu aplicar na prática conceitos de:
 O projeto continua em desenvolvimento e novas funcionalidades serão adicionadas progressivamente através dos próximos commits.
 
 
-## 🧱 Programação Orientada a Objetos
+## Programação Orientada a Objetos
 
 A reorganização do projeto também introduziu uma abordagem orientada a objetos para representar responsabilidades específicas da aplicação.
 

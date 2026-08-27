@@ -1,5 +1,7 @@
 # Architecture
 
+## 🏛️ Visão Geral e Fluxo da Arquitetura
+
 ```text
 ┌─────────────────────────────┐
 │          Streamlit          │
@@ -31,7 +33,9 @@
 └─────────────────────────────┘
 ```
 
-## 🔄 Fluxo de criação de uma ideia
+<details>
+
+<summary><h2>Fluxo de criação de uma ideia</h2></summary>
 
 O fluxo atual de criação segue aproximadamente esta sequência:
 
@@ -77,8 +81,11 @@ IdeaService
 
 Essa separação permite que a lógica da IA não fique diretamente acoplada à interface.
 
+</details>
 
-## Responsabilidades das camadas
+<details>
+
+<summary><h2>Responsabilidades das camadas</h2></summary>
 
 ### Presentation / Streamlit
 
@@ -121,8 +128,12 @@ UserRepository
 AIRepository
 ```
 
+</details>
 
-## Estrutura de pastas 
+<details>
+
+<summary><h2>Estrutura de pastas</h2></summary>
+
 ```text
 OlivIA Ideas/
 │
@@ -177,6 +188,8 @@ OlivIA Ideas/
 ├── .env.example
 └── README.md
 ```
+
+</details>
 
 > Algumas partes da estrutura já estão preparadas para funcionalidades que ainda serão implementadas nas próximas etapas.
 

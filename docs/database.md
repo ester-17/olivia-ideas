@@ -1,20 +1,85 @@
 # Database
 
-## 🗄️ Banco de dados
+## Banco de dados
 
 O projeto utiliza **MySQL** para persistência dos dados.
 
-A modelagem foi planejada para separar as principais entidades da aplicação:
+A modelagem foi planejada para separar as principais entidades da aplicação, garantindo integridade referencial e flexibilidade para o armazenamento de relatórios gerados por Inteligência Artificial.
+
+## DER
+
+![Diagrama ER do Banco de Dados](assets/der.png)
+
+<details>
+<summary>🔍 Clique para ver a versão simplificada em texto (ASCII)</summary>
 
 ```text
-users
-   │
-   └──< ideas
-          │
-          ├── idea_5w2h
-          │
-          └── ai_analysis
+┌─────────────────┐
+│      users      │
+├─────────────────┤
+│ PK id           │
+│ name            │
+│ email           │
+│ password_hash   │
+│ created_at      │
+└────────┬────────┘
+         │ 1
+         │
+         │ N
+┌────────▼────────┐
+│      ideas      │
+├─────────────────┤
+│ PK id           │
+│ FK user_id      │
+│ title           │
+│ description     │
+│ category        │
+│ status          │
+│ created_at      │
+│ updated_at      │
+└───────┬─────┬───┘
+        │1    │1
+        │     │
+        │     │N
+        │     ▼
+        │ ┌─────────────────────────┐
+        │ │       ai_analysis       │
+        │ ├─────────────────────────┤
+        │ │ PK id                   │
+        │ │ FK idea_id              │
+        │ │ score                   │
+        │ │ analysis_data (JSON)    │
+        │ │ created_at              │
+        │ └─────────────────────────┘
+        │
+        │1
+        │
+        │1
+┌───────▼────────────────┐
+│       idea_5w2h        │
+├────────────────────────┤
+│ PK id                  │
+│ FK idea_id             │
+│                        │
+│ what                   │
+│ what_source            │
+│ why                    │
+│ why_source             │
+│ where_location         │
+│ where_location_source  │
+│ when_info              │
+│ when_source            │
+│ who                    │
+│ who_source             │
+│ how                    │
+│ how_source             │
+│ how_much               │
+│ how_much_source        │
+│ created_at             │
+│ updated_at             │
+└────────────────────────┘
 ```
+</details>
 
 ### Principais entidades
 
@@ -44,73 +109,6 @@ Por isso, o projeto utiliza uma abordagem híbrida:
 - **JSON** para conteúdos de IA que podem possuir estruturas variáveis.
 
 Essa abordagem busca reduzir a necessidade de alterações frequentes no esquema do banco conforme novas seções de análise forem adicionadas.
-
-
-
-## DER
-```text
-┌─────────────────┐
-│      users      │
-├─────────────────┤
-│ PK id           │
-│ user_name       │
-│ email           │
-│ password_hash   │
-│ created_at      │
-└────────┬────────┘
-         │ 1
-         │
-         │ N
-┌────────▼────────┐
-│      ideas      │
-├─────────────────┤
-│ PK id           │
-│ FK user_id      │
-│ title           │
-│ description     │
-│ status          │
-│ created_at      │
-│ updated_at      │
-└───────┬─────┬───┘
-        │1    │1
-        │     │
-        │     │N
-        │     ▼
-        │ ┌─────────────────┐
-        │ │  ai_analysis    │
-        │ ├─────────────────┤
-        │ │ PK id           │
-        │ │ FK ideia_id     │
-        │ │ score           │
-        │ │ analysis_data   │
-        │ │ created_at      │
-        │ └─────────────────┘
-        │
-        │1
-        │
-        │1
-┌───────▼─────────┐
-│   idea_5w2h     │
-├─────────────────┤
-│ PK id           │
-│ FK idea_id      │
-│                 │
-│ what            │
-│ what_source     │
-│ why             │
-│ why_source      │
-│ where_          │
-│ where_source    │
-│ when_           │
-│ when_source     │
-│ who             │
-│ who_source      │
-│ how             │
-│ how_source      │
-│ how_much        │
-│ how_much_source │
-└─────────────────┘
-```
 
 ## Modelagem de dados
 O OlivIA Ideas foi projetado para permitir a evolução dos prompts de IA sem exigir alterações frequentes no banco de dados.
