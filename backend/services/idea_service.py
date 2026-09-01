@@ -2,6 +2,10 @@ from backend.repositories.idea_repository import IdeaRepository
 from backend.services.ai_service import AIService
 from backend.services.validation_service import ValidationService
 
+import logging
+
+logger = logging.getLogger("olivia.services.idea")
+
 class IdeaService:
     """
     Orchestrates the creation and analysis process of an idea.
@@ -15,9 +19,13 @@ class IdeaService:
     """
 
     def __init__(self):
+        logger.debug("Initializing IdeaService")
+
         self.validation_service = ValidationService()
         self.ai_service = AIService()
         self.repository = IdeaRepository()
+
+        logger.debug("IdeaService initialized successfully")
 
     def create_idea(self, payload: dict) -> dict:
         """
@@ -31,24 +39,45 @@ class IdeaService:
             A dictionary containing the generated 'idea_id' and an optional
             Markdown 'report' string if requested.
         """
+
+        logger.info("Starting idea creation")
+
         # 1. Validation
+        logger.debug("Validating idea payload")
+
         payload = self.validation_service.validate_payload(payload)
         options = payload["options"]
         show_report = options["show_report"]
 
+        logger.debug("Payload validated successfully")
+
         # 2. Save idea
+    
+        logger.debug("Persisting idea")
+
         idea_id = self.repository.create(payload["idea"])
+
+        logger.info("Idea created successfully")
 
         # 3. AI
         report = None
 
         if self._should_use_ai(options):
+            logger.debug("Generating AI analysis for idea_id: %s", idea_id)
+
             analysis = self.ai_service.generate(payload)
+
+            logger.info("AI analysis generated successfully for idea_id: %s", idea_id)
+
+            logger.debug("Persisting AI analysis for idea_id: %s", idea_id)
+
             self.repository.save_analysis(
                 idea_id = idea_id, analysis = analysis
             )
+            logger.info("AI analysis persisted successfully for idea_id: %s", idea_id)
 
             if show_report:
+                # TODO: Try/Except
                 report = self.ai_service.to_markdown(analysis)
 
         # 4. Return results
@@ -67,5 +96,7 @@ class IdeaService:
         Returns:
             True if any AI feature flag is active, False otherwise.
         """
+        logger.debug("Checking if AI features should be used")
+        
         use_ai = options["use_ai"]
         return (use_ai["title"] or any(use_ai["methodology"].values()))

@@ -1,4 +1,7 @@
 import streamlit as st
+from backend.utils.logger import setup_logger
+
+setup_logger()
 
 st.set_page_config(
     page_title="OlivIA Ideas",
@@ -7,7 +10,7 @@ st.set_page_config(
 )
 pages = {
     '': [
-        st.Page("./frontend/pages/hero.py", title="OlivIA Ideias", default=True),
+        st.Page("./frontend/pages/hero.py", title="OlivIA Ideas", default=True),
     ],
     '💭 Ideias': [
         st.Page("frontend/pages/create.py", title="Criar Ideia"),

@@ -1,7 +1,9 @@
+import logging
 import streamlit as st
 
 from backend.controllers.create_idea_controller import create_idea_controller
 
+logger = logging.getLogger("olivia.frontend.create")
 
 # ==================================================
 # Constants
@@ -17,24 +19,16 @@ FIELDS = [
     ("how_much", "How Much (Quanto?)", "Ex.: R$ 5.000, sem custos iniciais ou aproximadamente 100 horas de desenvolvimento."),
 ]
 
-
 # ==================================================
 # Page
 # ==================================================
 
 def configure_page():
 
-    st.set_page_config(
-        page_title="OlivIA Ideas",
-        page_icon="🧠",
-        layout="centered"
-    )
-
     st.markdown(
         "<h1 style='text-align:center;'>Criar Ideia</h1>",
         unsafe_allow_html=True
     )
-
 
 # ==================================================
 # Form
@@ -56,20 +50,11 @@ def render_form():
         else "Gerar título com IA."
     )
 
-    if idea_title:
-        ai_title = st.checkbox(
-            "Refinar com IA",
-            help=(
-                "Se o título estiver vazio, a IA irá gerar um novo. "
-                "Caso contrário, ela irá sugerir uma versão aprimorada."
-                ))
-    
-    else:
-        ai_title = st.checkbox(
-            "Gerar título com IA",
-            help=(
-                "Se o título estiver vazio, a IA irá gerar um novo. "
-                "Caso contrário, ela irá sugerir uma versão aprimorada."
+    ai_title = st.checkbox(
+        checkbox_label,
+        help=(
+            "Se o título estiver vazio, a IA irá gerar um novo. "
+            "Caso contrário, ela irá sugerir uma versão aprimorada."
             ))
 
 
@@ -78,7 +63,6 @@ def render_form():
         placeholder="Ex: Um sistema que transforma ideias em oportunidades...",
         height=150
     )
-
 
     st.divider()
 
@@ -155,8 +139,6 @@ def render_form():
 
         "manual_5w2h": manual_5w2h == "Manual",
 
-        "use_ai": use_ai,
-
         "show_report": show_report,
 
         "methodology_data": methodology_data,
@@ -211,20 +193,25 @@ def build_payload(form_data):
 def submit(payload):
 
     try:
-
-        response = (
-            create_idea_controller.create_idea(payload)
+        logger.info(
+            "Submitting payload to controller | use_ai:%s | show_report:%s",
+            payload["options"]["use_ai"],
+            payload["options"]["show_report"]
         )
 
+        response = (create_idea_controller.create_idea(payload))
+
         st.success("Ideia criada com sucesso!")
+        logger.info("Payload submitted successfully")
 
         if response.get("report"):
 
             st.markdown(response["report"])
 
-    except Exception as exc:
+    except Exception:
 
-        st.error(f"Erro: {exc}")
+        logger.exception("Failed to submit idea")
+        st.error(f"Não foi possível criar a ideia.")
 
 
 # ==================================================
@@ -234,7 +221,6 @@ def submit(payload):
 def main():
 
     configure_page()
-
     form_data = render_form()
 
     st.divider()
@@ -243,12 +229,14 @@ def main():
         "Criar ideia",
         use_container_width=True
     ):
+        logger.info("Create idea button clicked.")
 
         if not form_data["title"].strip():
 
             st.error(
                 "Informe um título para a ideia."
             )
+            logger.warning("Form submission rejected: Title field is empty.")
 
             return
 
@@ -257,10 +245,12 @@ def main():
             st.error(
                 "Informe uma descrição para a ideia."
             )
+            logger.warning("Form submission rejected: Description field is empty.") 
 
             return
 
         payload = build_payload(form_data)
+        logger.info("Payload built successfully, submitting to controller.")
 
         submit(payload)
 

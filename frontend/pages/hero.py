@@ -33,7 +33,7 @@ st.markdown(HERO_CSS, unsafe_allow_html=True)
 # ==========================================
 
 st.markdown(
-    '<h1 class="hero-title">OlivIA Ideias</h1>',
+    '<h1 class="hero-title">OlivIA Ideas</h1>',
     unsafe_allow_html=True)
 st.markdown(
     '<h2 class="hero-subtitle">Transforme ideias em oportunidades reais</h2>', unsafe_allow_html=True    )
