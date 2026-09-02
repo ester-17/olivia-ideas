@@ -25,8 +25,6 @@ class IdeaService:
         self.ai_service = AIService()
         self.repository = IdeaRepository()
 
-        logger.debug("IdeaService initialized successfully")
-
     def create_idea(self, payload: dict) -> dict:
         """
         Creates a new idea and conditionally generates its AI analysis.
@@ -57,29 +55,32 @@ class IdeaService:
 
         idea_id = self.repository.create(payload["idea"])
 
-        logger.info("Idea created successfully")
+        logger.info("Idea persisted successfully | idea_id: %s", idea_id)
 
         # 3. AI
         report = None
 
+
         if self._should_use_ai(options):
-            logger.debug("Generating AI analysis for idea_id: %s", idea_id)
+            # 🚧 TEMPORARIO - Later change to debug
+            logger.info("AI features requested")
 
             analysis = self.ai_service.generate(payload)
 
-            logger.info("AI analysis generated successfully for idea_id: %s", idea_id)
+            logger.info("AI analysis generated successfully | idea_id: %s", idea_id)
 
-            logger.debug("Persisting AI analysis for idea_id: %s", idea_id)
+            logger.debug("Persisting AI analysis | idea_id: %s", idea_id)
 
             self.repository.save_analysis(
                 idea_id = idea_id, analysis = analysis
             )
-            logger.info("AI analysis persisted successfully for idea_id: %s", idea_id)
+            logger.info("AI analysis persisted successfully | idea_id: %s", idea_id)
 
             if show_report:
-                # TODO: Try/Except
+                logger.debug("Generating Markdown report | idea_id: %s", idea_id)
                 report = self.ai_service.to_markdown(analysis)
 
+        logger.info("Idea creation completed successfully | idea_id: %s", idea_id)
         # 4. Return results
         return {
             "idea_id": idea_id,
