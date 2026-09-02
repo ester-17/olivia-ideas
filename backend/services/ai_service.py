@@ -1,3 +1,4 @@
+import logging
 from google import genai
 import os
 from dotenv import load_dotenv
@@ -5,6 +6,7 @@ from dotenv import load_dotenv
 from backend.services.ai_response_parser import AIResponseParser
 from backend.services.prompt_service import PromptService
 
+logger = logging.getLogger("olivia.services.ai")
 load_dotenv()
 
 class AIServiceError(Exception):
@@ -26,10 +28,10 @@ class AIService:
     MODEL_NAME = "gemini-2.5-flash"
 
     def __init__(self) -> None:
+        logger.debug("Initializing AIService")
 
         self.prompt_service = PromptService()
         self.parser = AIResponseParser()
-
         self.client = self._create_client()
 
     def generate(self, payload: dict) -> dict:
@@ -41,11 +43,17 @@ class AIService:
 
         Returns:
             The parsed Python object processed by the AIResponseParser.
-        """
+        """ 
+        logger.info("Starting idea analysis")
+
         prompt = self._build_prompt(payload)
         response = self._call_model(prompt)
         text = self._extract_text(response)
-        return self.parser.parse(text)
+
+        analysis = self.parser.parse(text)
+        logger.debug("AI response parsed successfully")
+
+        return analysis
 
     def to_markdown(self, analysis) -> str:
         """
@@ -70,6 +78,7 @@ class AIService:
         Returns:
             The complete prompt text.
         """
+        logger.debug("Building prompt for AI model")
 
         return self.prompt_service.build(payload)
 
@@ -87,11 +96,13 @@ class AIService:
             AIServiceError: if the API call fails.
         """
         try:
+            logger.debug("Calling Gemini model | model=%s", self.MODEL_NAME)
             return self.client.models.generate_content(
                 model=self.MODEL_NAME,
                 contents=prompt
             )
         except Exception as exc:
+            logger.exception("Failed to communicate with Gemini")
             raise AIServiceError("Failed to communicate with Gemini.") from exc
 
     def _extract_text(self, response) -> str:
@@ -108,16 +119,19 @@ class AIService:
             AIServiceError: If the response is missing, invalid, or empty.
         """
         if response is None:
+            logger.error("No response returned from Gemini")
             raise AIServiceError(
                 "Nenhuma resposta foi retornada pela IA."
             )
 
         if not hasattr(response, "text"):
+            logger.error("Invalid response structure from Gemini")
             raise AIServiceError(
                 "Resposta inválida recebida da IA."
             )
 
         if not response.text:
+            logger.error("Empty response text from Gemini")
             raise AIServiceError(
                 "A IA retornou uma resposta vazia."
             )
@@ -126,11 +140,12 @@ class AIService:
 
     def _create_client(self) -> genai.Client:
         """
-        Creates and configure the Google GenAI client.
+        Creates and configures the Google GenAI client.
 
         Returns:
             An initialized Google GenAI client.
         """
+        logger.debug("Creating Google GenAI client")
         api_key = self._get_api_key()
 
         return genai.Client(api_key=api_key)
@@ -145,8 +160,10 @@ class AIService:
         Raises:
             AIServiceError: If the GEMINI_API_KEY is not defined.
         """
+        logger.debug("Fetching Gemini API key")
         key = os.getenv("GEMINI_API_KEY")
         if not key:
-            raise AIServiceError("❌ GEMINI_API_KEY not found")
+            logger.error("GEMINI_API_KEY not found in environment variables")
+            raise AIServiceError("GEMINI_API_KEY not found")
 
         return key
