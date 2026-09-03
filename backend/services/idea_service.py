@@ -1,8 +1,8 @@
+import logging
+
 from backend.repositories.idea_repository import IdeaRepository
 from backend.services.ai_service import AIService
 from backend.services.validation_service import ValidationService
-
-import logging
 
 logger = logging.getLogger("olivia.services.idea")
 
@@ -12,6 +12,7 @@ class IdeaService:
 
     Workflow:
         1. Validate the incoming payload.
+        NEW. Resolve AI-generated fields (Title and 5W2H methodology).
         2. Persist the main idea and 5W2H data.
         3. Generate AI analysis if requested.
         4. Save the generated AI analysis.
@@ -45,38 +46,36 @@ class IdeaService:
 
         payload = self.validation_service.validate_payload(payload)
         options = payload["options"]
-        show_report = options["show_report"]
+        # show_report = options["show_report"]
 
-        logger.debug("Payload validated successfully")
+        # logger.debug("Payload validated successfully")
 
-        # 2. Save idea
+        # Process Title and 5W2H through AI if requested/needed
+        if self._should_process_fields_with_ai(options):
+            logger.info("Processing title/5W2H field suggestions with AI")
+            payload = self.ai_service.process_idea_fields(payload)
+
+        # Save idea
     
         logger.debug("Persisting idea")
-
         idea_id = self.repository.create(payload["idea"])
-
         logger.info("Idea persisted successfully | idea_id: %s", idea_id)
 
-        # 3. AI
+        # Generate AI analysis / Report
         report = None
-
-
-        if self._should_use_ai(options):
-            # 🚧 TEMPORARIO - Later change to debug
-            logger.info("AI features requested")
+        if self._should_generate_analysis(options):
+            logger.info("AI analysis requested | idea_id: %s ", idea_id)
 
             analysis = self.ai_service.generate(payload)
-
             logger.info("AI analysis generated successfully | idea_id: %s", idea_id)
 
             logger.debug("Persisting AI analysis | idea_id: %s", idea_id)
-
             self.repository.save_analysis(
                 idea_id = idea_id, analysis = analysis
             )
             logger.info("AI analysis persisted successfully | idea_id: %s", idea_id)
 
-            if show_report:
+            if options.get("show_report", False):
                 logger.debug("Generating Markdown report | idea_id: %s", idea_id)
                 report = self.ai_service.to_markdown(analysis)
 
@@ -101,3 +100,16 @@ class IdeaService:
         
         use_ai = options["use_ai"]
         return (use_ai["title"] or any(use_ai["methodology"].values()))
+
+    def _should_generate_analysis(self, options: dict) -> bool:
+        """ Determines if a full business analysis should be generated.
+        
+        Args:
+            options: A dictionary containing the AI feature flags and user preferences.
+            
+        Returns:
+            True if the user requested an AI analysis, False otherwise.
+        """
+        # se salvar e analisar ou salvar e mostrar relatório, então gerar análise
+        
+        return False
