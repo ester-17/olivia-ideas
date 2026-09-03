@@ -10,8 +10,13 @@ logger = logging.getLogger("olivia.frontend.create")
 # ==================================================
 
 FIELDS = [
-    ("what", "What (O que?)", "Ex.: Plataforma para conectar estudantes a empresas para estágios"),
-    ("why", "Why (Por quê?)", "Ex.: Resolver um problema recorrente ou atender uma necessidade ainda pouco explorada."),
+    ("what",
+     "What (O que?)",
+     "Ex.: Plataforma para conectar estudantes a empresas para estágios"
+     ),
+    ("why",
+     "Why (Por quê?)",
+     "Ex.: Resolver um problema recorrente ou atender uma necessidade ainda pouco explorada."),
     ("where", "Where (Onde?)", "Ex.: Aplicativo, site, empresa, escola ou qualquer ambiente onde a solução será utilizada."),
     ("when", "When (Quando?)", "Ex.: Lançamento em 6 meses, implantação gradual ou execução imediata."),
     ("who", "Who (Quem?)", "Ex.: Estudantes, pequenas empresas, profissionais autônomos ou consumidores em geral."),
@@ -24,6 +29,7 @@ FIELDS = [
 # ==================================================
 
 def configure_page():
+    """Render the create-idea page title."""
 
     st.markdown(
         "<h1 style='text-align:center;'>Criar Ideia</h1>",
@@ -35,13 +41,14 @@ def configure_page():
 # ==================================================
 
 def render_form():
+    """Render the idea creation form and return its data as a dictionary."""
 
     st.subheader("Ideia")
 
     idea_title = st.text_area(
         "Dê um título à sua ideia",
         placeholder="Ex: OlivIA Ideas",
-        height=60
+        height=60,
     )
 
     checkbox_label = (
@@ -55,7 +62,9 @@ def render_form():
         help=(
             "Se o título estiver vazio, a IA irá gerar um novo. "
             "Caso contrário, ela irá sugerir uma versão aprimorada."
-            ))
+            ),
+            value=not idea_title.strip()
+        )
 
 
     idea_description = st.text_area(
@@ -77,8 +86,7 @@ def render_form():
         )
     )
 
-    use_ai = analysis_mode != "Salvar apenas"
-
+    generate_analysis = analysis_mode != "Salvar apenas"
     show_report = analysis_mode == "Salvar, analisar e exibir relatório"
 
     manual_5w2h = st.radio(
@@ -122,7 +130,7 @@ def render_form():
 
             methodology_data[field] = text
             if text:
-                if use_ai:
+                if manual_5w2h == "Manual":
                     ai_suggestions[field] = (st.checkbox(
                             "Refinar com IA",
                             key=f"{field}_ai"
@@ -136,14 +144,11 @@ def render_form():
 
         "title": idea_title,
         "description": idea_description,
-
         "manual_5w2h": manual_5w2h == "Manual",
-
+        "generate_analysis": generate_analysis,
         "show_report": show_report,
-
         "methodology_data": methodology_data,
-
-        "use_ai": {
+        "ai_options": {
             "title": ai_title,
             "methodology": ai_suggestions
         },
@@ -155,57 +160,62 @@ def render_form():
 # ==================================================
 
 def build_payload(form_data):
+    """Build the payload expected by the create-idea controller."""
 
-    return {
+    payload = {
 
         "idea": {
 
             "title": form_data["title"].strip(),
-
             "description": form_data["description"].strip(),
-
             "methodology": {
-
                 "type": "5w2h",
-
                 "data": form_data["methodology_data"]
-
-            }
-
+            },
         },
-
         "options": {
-
             "manual_5w2h": form_data["manual_5w2h"],
-
+            "generate_analysis": form_data["generate_analysis"],
             "show_report": form_data["show_report"],
-
-            "use_ai": form_data["use_ai"]
-
-        }
-
+            "ai_options": form_data["ai_options"]
+        },
     }
+
+    logger.debug(
+        "Idea payload built | manual_5w2h=%s | generate_analysis=%s | " "show_report=%s | ai_title=%s",
+        payload["options"]["manual_5w2h"],
+        payload["options"]["generate_analysis"],
+        payload["options"]["show_report"],
+        payload["options"]["ai_options"]["title"], 
+        )
+
+    return payload
 
 # ==================================================
 # Submit
 # ==================================================
 
 def submit(payload):
+    """Submit an idea payload to the create-idea controller."""
 
     try:
+        options = payload["options"]
+
         logger.info(
-            "Submitting payload to controller | use_ai:%s | show_report:%s",
-            payload["options"]["use_ai"],
-            payload["options"]["show_report"]
+            "Submitting payload to controller | generate_analysis:%s | show_report:%s",
+            payload["options"]["generate_analysis"],
+            payload["options"]["show_report"],
+            options["ai_options"]["title"],
         )
 
         response = (create_idea_controller.create_idea(payload))
 
+        logger.info(
+            "Idea submitted successfully | idea_id: %s ", response("idea_id"))
         st.success("Ideia criada com sucesso!")
-        logger.info("Payload submitted successfully")
 
         if response.get("report"):
-
+            logger.debug("Displaying AI report")
             st.markdown(response["report"])
 
     except Exception:
@@ -219,6 +229,7 @@ def submit(payload):
 # ==================================================
 
 def main():
+    """Render and handle idea creation."""
 
     configure_page()
     form_data = render_form()
@@ -231,30 +242,20 @@ def main():
     ):
         logger.info("Create idea button clicked.")
 
-        if not form_data["title"].strip():
-
-            st.error(
-                "Informe um título para a ideia."
-            )
-            logger.warning("Form submission rejected: Title field is empty.")
-
-            return
-
         if not form_data["description"].strip():
 
             st.error(
                 "Informe uma descrição para a ideia."
             )
-            logger.warning("Form submission rejected: Description field is empty.") 
+            logger.warning("Form submission rejected: description field is empty.") 
 
             return
 
         payload = build_payload(form_data)
-        logger.info("Payload built successfully, submitting to controller.")
+        # TALVEZ ADICIONAR UM PRINT DO PAYLOAD COMPLETO PARA DEBUGAR MELHOR
 
         submit(payload)
 
 
 if __name__ == "__main__":
-
     main()

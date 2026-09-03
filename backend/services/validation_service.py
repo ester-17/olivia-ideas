@@ -59,7 +59,7 @@ class ValidationService:
 
         if "methodology" not in idea:
             raise ValidationError("The 'methodology' field is missing.")
-        self._validate_title(idea["title"])
+        # self._validate_title(idea["title"])
         self._validate_description(idea["description"])
         self._validate_5w2h(idea["methodology"])
 
@@ -102,13 +102,13 @@ class ValidationService:
                     f"The option '{field}' must be boolean."
                 )
 
-    def _validate_title(self, title) -> None:
-        if not isinstance(title, str):
-            raise ValidationError("Title must be a text.")
-        if not title.strip():
-            raise ValidationError("Title can't be empty.")
-        if len(title) > 150:
-            raise ValidationError("Title must be a maximum of 150 characters long.")
+    # def _validate_title(self, title) -> None:
+    #     if not isinstance(title, str):
+    #         raise ValidationError("Title must be a text.")
+    #     if not title.strip():
+    #         raise ValidationError("Title can't be empty.")
+    #     if len(title) > 150:
+    #         raise ValidationError("Title must be a maximum of 150 characters long.")
 
     def _validate_description(self, description) -> None:
         if not isinstance(description, str):
