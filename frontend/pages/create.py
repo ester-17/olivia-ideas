@@ -5,18 +5,11 @@ from backend.controllers.create_idea_controller import create_idea_controller
 
 logger = logging.getLogger("olivia.frontend.create")
 
-# ==================================================
 # Constants
-# ==================================================
 
 FIELDS = [
-    ("what",
-     "What (O que?)",
-     "Ex.: Plataforma para conectar estudantes a empresas para estágios"
-     ),
-    ("why",
-     "Why (Por quê?)",
-     "Ex.: Resolver um problema recorrente ou atender uma necessidade ainda pouco explorada."),
+    ("what","What (O que?)","Ex.: Plataforma para conectar estudantes a empresas para estágios"),
+    ("why","Why (Por quê?)","Ex.: Resolver um problema recorrente ou atender uma necessidade ainda pouco explorada."),
     ("where", "Where (Onde?)", "Ex.: Aplicativo, site, empresa, escola ou qualquer ambiente onde a solução será utilizada."),
     ("when", "When (Quando?)", "Ex.: Lançamento em 6 meses, implantação gradual ou execução imediata."),
     ("who", "Who (Quem?)", "Ex.: Estudantes, pequenas empresas, profissionais autônomos ou consumidores em geral."),
@@ -24,9 +17,7 @@ FIELDS = [
     ("how_much", "How Much (Quanto?)", "Ex.: R$ 5.000, sem custos iniciais ou aproximadamente 100 horas de desenvolvimento."),
 ]
 
-# ==================================================
 # Page
-# ==================================================
 
 def configure_page():
     """Render the create-idea page title."""
@@ -36,9 +27,7 @@ def configure_page():
         unsafe_allow_html=True
     )
 
-# ==================================================
 # Form
-# ==================================================
 
 def render_form():
     """Render the idea creation form and return its data as a dictionary."""
@@ -150,14 +139,11 @@ def render_form():
         "methodology_data": methodology_data,
         "ai_options": {
             "title": ai_title,
-            "methodology": ai_suggestions
+            "methodology": ai_suggestions,
         },
     }
 
-
-# ==================================================
 # Payload
-# ==================================================
 
 def build_payload(form_data):
     """Build the payload expected by the create-idea controller."""
