@@ -4,7 +4,9 @@ from backend.repositories.idea_repository import IdeaRepository
 from backend.services.ai_service import AIService
 from backend.services.validation_service import ValidationService
 
+
 logger = logging.getLogger("olivia.services.idea")
+
 
 class IdeaService:
     """
@@ -12,14 +14,16 @@ class IdeaService:
 
     Workflow:
         1. Validate the incoming payload.
-        NEW. Resolve AI-generated fields (Title and 5W2H methodology).
-        2. Persist the main idea and 5W2H data.
-        3. Generate AI analysis if requested.
-        4. Save the generated AI analysis.
-        5. Return the final result to the controller.
+        2. Resolve AI processing requirements.
+        3. Execute AI generation/refinement and analysis in a single request.
+        4. Persist the main idea and 5W2H data.
+        5. Persist the AI analysis, if generated.
+        6. Return the final result to the controller.
     """
 
     def __init__(self):
+        """Initialize the services and repository."""
+
         logger.debug("Initializing IdeaService")
 
         self.validation_service = ValidationService()
@@ -28,88 +32,223 @@ class IdeaService:
 
     def create_idea(self, payload: dict) -> dict:
         """
-        Creates a new idea and conditionally generates its AI analysis.
-        
+        Create a new idea and process requested AI features.
+
         Args:
-            payload: A dictionary containing the raw idea data, 5W2H methodology,
-            and options sent by the controller.
+            payload: Dictionary containing the idea data and processing options.
 
         Returns:
-            A dictionary containing the generated 'idea_id' and an optional
-            Markdown 'report' string if requested.
+            Dictionary containing the created idea ID and an optional report.
         """
 
         logger.info("Starting idea creation")
 
+        # ==================================================
         # 1. Validation
+        # ==================================================
+
         logger.debug("Validating idea payload")
 
         payload = self.validation_service.validate_payload(payload)
+
         options = payload["options"]
-        # show_report = options["show_report"]
 
-        # logger.debug("Payload validated successfully")
+        logger.debug(
+            "Payload structure and types validated successfully"
+        )
 
-        # Process Title and 5W2H through AI if requested/needed
-        if self._should_process_fields_with_ai(options):
-            logger.info("Processing title/5W2H field suggestions with AI")
-            payload = self.ai_service.process_idea_fields(payload)
+        # ==================================================
+        # 2. Resolve AI tasks
+        # ==================================================
 
-        # Save idea
-    
-        logger.debug("Persisting idea")
-        idea_id = self.repository.create(payload["idea"])
-        logger.info("Idea persisted successfully | idea_id: %s", idea_id)
+        ai_tasks = self._resolve_ai_tasks(payload)
 
-        # Generate AI analysis / Report
-        report = None
-        if self._should_generate_analysis(options):
-            logger.info("AI analysis requested | idea_id: %s ", idea_id)
-
-            analysis = self.ai_service.generate(payload)
-            logger.info("AI analysis generated successfully | idea_id: %s", idea_id)
-
-            logger.debug("Persisting AI analysis | idea_id: %s", idea_id)
-            self.repository.save_analysis(
-                idea_id = idea_id, analysis = analysis
+        if ai_tasks:
+            logger.info(
+                "AI processing requested | tasks=%s",
+                ai_tasks
             )
-            logger.info("AI analysis persisted successfully | idea_id: %s", idea_id)
+
+            payload, analysis_data = self.ai_service.process(
+                payload,
+                ai_tasks
+            )
+
+        else:
+            logger.debug("No AI processing requested")
+            analysis_data = None
+
+        # ==================================================
+        # 3. Persist idea
+        # ==================================================
+
+        logger.debug("Persisting idea")
+
+        idea_id = self.repository.create(
+            payload["idea"]
+        )
+
+        logger.info(
+            "Idea persisted successfully | idea_id=%s",
+            idea_id
+        )
+
+        # ==================================================
+        # 4. Persist AI analysis
+        # ==================================================
+
+        report = None
+
+        if analysis_data:
+
+            logger.debug(
+                "Persisting AI analysis | idea_id=%s",
+                idea_id
+            )
+
+            self.repository.save_analysis(
+                idea_id=idea_id,
+                analysis=analysis_data
+            )
+
+            logger.info(
+                "AI analysis persisted successfully | idea_id=%s",
+                idea_id
+            )
+
+            # ==================================================
+            # 5. Generate report
+            # ==================================================
 
             if options.get("show_report", False):
-                logger.debug("Generating Markdown report | idea_id: %s", idea_id)
-                report = self.ai_service.to_markdown(analysis)
 
-        logger.info("Idea creation completed successfully | idea_id: %s", idea_id)
-        # 4. Return results
+                logger.debug(
+                    "Generating Markdown report | idea_id=%s",
+                    idea_id
+                )
+
+                report = self.ai_service.to_markdown(
+                    analysis_data
+                )
+
+        logger.info(
+            "Idea creation completed successfully | idea_id=%s",
+            idea_id
+        )
+
         return {
             "idea_id": idea_id,
-            "report": report
+            "report": report,
         }
 
-    def _should_use_ai(self, options: dict) -> bool:
+    # ==================================================
+    # AI Task Resolution
+    # ==================================================
+
+    def _resolve_ai_tasks(self, payload: dict) -> dict:
         """
-        Determines if any AI-powered feature was requested by the user.
+        Determine which operations should be performed by AI.
+
+        The method distinguishes between generating new content,
+        refining existing content, and generating a complete analysis.
 
         Args:
-            options: A dictionary containing the 'use_ai' feature flags.
+            payload: Validated idea creation payload.
 
         Returns:
-            True if any AI feature flag is active, False otherwise.
+            Dictionary describing the AI operations to execute.
         """
-        logger.debug("Checking if AI features should be used")
-        
-        use_ai = options["use_ai"]
-        return (use_ai["title"] or any(use_ai["methodology"].values()))
 
-    def _should_generate_analysis(self, options: dict) -> bool:
-        """ Determines if a full business analysis should be generated.
-        
-        Args:
-            options: A dictionary containing the AI feature flags and user preferences.
-            
-        Returns:
-            True if the user requested an AI analysis, False otherwise.
-        """
-        # se salvar e analisar ou salvar e mostrar relatório, então gerar análise
-        
-        return False
+        idea = payload["idea"]
+        options = payload["options"]
+        ai_options = options.get("ai_options", {})
+
+        tasks = {}
+
+        # ==================================================
+        # Title
+        # ==================================================
+
+        if ai_options.get("title", False):
+
+            title = idea["title"].strip()
+
+            action = "refine" if title else "generate"
+
+            tasks["title"] = action
+
+            logger.debug(
+                "AI title task resolved | action=%s",
+                action
+            )
+
+        # ==================================================
+        # 5W2H
+        # ==================================================
+
+        manual_5w2h = options.get(
+            "manual_5w2h",
+            False
+        )
+
+        if not manual_5w2h:
+
+            tasks["methodology"] = "generate"
+
+            logger.debug(
+                "AI methodology task resolved | action=generate"
+            )
+
+        else:
+
+            methodology_options = ai_options.get(
+                "methodology",
+                {}
+            )
+
+            methodology_data = (
+                idea
+                .get("methodology", {})
+                .get("data", {})
+            )
+
+            methodology_tasks = {}
+
+            for field, requested in methodology_options.items():
+
+                if not requested:
+                    continue
+
+                value = methodology_data.get(
+                    field,
+                    ""
+                ).strip()
+
+                action = "refine" if value else "generate"
+
+                methodology_tasks[field] = action
+
+                logger.debug(
+                    "AI methodology task resolved | "
+                    "field=%s | action=%s",
+                    field,
+                    action
+                )
+
+            if methodology_tasks:
+
+                tasks["methodology"] = methodology_tasks
+
+        # ==================================================
+        # Full Analysis
+        # ==================================================
+
+        if options.get("generate_analysis", False):
+
+            tasks["analysis"] = True
+
+            logger.debug(
+                "AI analysis task resolved | generate_analysis=True"
+            )
+
+        return tasks
