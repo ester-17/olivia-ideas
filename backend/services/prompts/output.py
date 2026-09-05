@@ -3,13 +3,20 @@ OUTPUT_FORMAT_PROMPT = """
 
 Retorne SOMENTE um JSON válido.
 
-Utilize a seguinte estrutura quando os respectivos campos
-forem solicitados:
+Utilize somente os blocos correspondentes às tarefas solicitadas.
+
+### Título
+Se a tarefa de título for solicitada:
 
 {
-    "title": "...",
+    "title": "..."
+}
 
-    "methodology": {
+### 5W2H
+
+Se a tarefa de título for solicitada:
+{
+    "fivew2h": {
         "what": "...",
         "why": "...",
         "where": "...",
@@ -17,8 +24,13 @@ forem solicitados:
         "who": "...",
         "how": "...",
         "how_much": "..."
-    },
+    }
+}
 
+### Análise
+
+Se a análise for solicitada:
+{
     "analysis": {
         "problem": "...",
         "viability": 0,
@@ -29,6 +41,7 @@ forem solicitados:
     }
 }
 
-Inclua somente os blocos solicitados pelas tarefas.
-Não altere campos que não foram solicitados.
+Não inclue blocos que não foram solicitados.
+Não altere informações que não fazem parte da tarefa.
+Não adicione explicações, Markdown ou texto fora do JSON.
 """
