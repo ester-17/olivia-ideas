@@ -51,27 +51,30 @@ class AIService:
         logger.info("Processing single-pass AI tasks | tasks=%s", ai_tasks)
 
         # 1. Build unified prompt
-        prompt = self.prompt_service.build(payload)
+        prompt = self.prompt_service.build(payload, ai_tasks)
 
         # 2. Call Gemini model
         response = self._call_model(prompt)
         text = self._extract_text(response)
 
         # 3. Parse JSON response
+        logger.debug("Raw AI response | text=%r", text)
         parsed_response = self.parser.parse(text)
         logger.debug("AI response parsed successfully")
- 
-        # 4. Updated payload with generated/refined fields
+
+        # 4. Update payload with generated/refined fields
         if "title" in ai_tasks and "title" in parsed_response:
             payload["idea"]["title"] = parsed_response["title"]
             logger.debug("Updated payload title from AI response")
 
         if "methodology" in ai_tasks and "fivew2h" in parsed_response:
             payload["idea"]["methodology"]["data"].update(parsed_response["fivew2h"])
-            logger.debu("Updated payload 5W2H methodology from AI response")
+            logger.debug("Updated payload 5W2H methodology from AI response")
 
-        # 5. Extract analysis payload if requested
-        analysis_data = parsed_response if ai_tasks.get("analysis") else None
+        # 5. Extract internal analysis payload if requested
+        analysis_data = parsed_response.get(
+            "analysis"
+        ) if ai_tasks.get("analysis") else None
 
         return payload, analysis_data
 

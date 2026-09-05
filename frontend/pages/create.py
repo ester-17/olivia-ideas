@@ -188,7 +188,7 @@ def submit(payload):
         options = payload["options"]
 
         logger.info(
-            "Submitting payload to controller | generate_analysis:%s | show_report:%s",
+            "Submitting payload to controller | generate_analysis:%s | show_report:%s | title: %s",
             payload["options"]["generate_analysis"],
             payload["options"]["show_report"],
             options["ai_options"]["title"],
@@ -197,7 +197,7 @@ def submit(payload):
         response = (create_idea_controller.create_idea(payload))
 
         logger.info(
-            "Idea submitted successfully | idea_id: %s ", response("idea_id"))
+            "Idea submitted successfully | idea_id: %s ", response.get("idea_id"))
         st.success("Ideia criada com sucesso!")
 
         if response.get("report"):
