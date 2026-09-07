@@ -1,7 +1,8 @@
 import streamlit as st
 import os
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+
 
 load_dotenv()
 
@@ -15,11 +16,12 @@ def get_api_key():
 
 
 def generate_text(prompt: str) -> str:
-    genai.configure(api_key=get_api_key())
+    client = genai.Client(api_key=get_api_key())
 
-    model = genai.GenerativeModel("gemini-2.5-flash")
-
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        content=prompt,
+    )
 
     return response.text if response and response.text else "Sem resposta."
 
@@ -45,4 +47,4 @@ def analyze_idea(idea: str) -> str:
         return generate_text(prompt)
 
     except Exception as e:
-        return f"❌ Erro ao analisar ideia: {str(e)}"
+        return f"❌ Erro ao analisar ideia."
