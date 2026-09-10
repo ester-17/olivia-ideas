@@ -10,7 +10,7 @@ O projeto começou como o **IdeaForge AI**, um MVP desenvolvido principalmente p
 
 > 🔗 **Demo online — IdeaForge AI**
 >
-> Acesse: https://hjpxjhq3af6tpeg3cjcyfe.streamlit.app/
+> Acesse: https://olivia-ideas-demo-f7phr9pugbhhdqlnwanuot.streamlit.app/
 
 ---
 
