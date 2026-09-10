@@ -110,7 +110,7 @@ class IdeaRepository:
         Serializes and inserts the analysis dictionary as a JSON string.
         """
         sql = """
-            INSERT INTO idea_analysis(
+            INSERT INTO ai_analysis(
                 idea_id,
                 analysis
             )
