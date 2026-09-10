@@ -228,6 +228,7 @@ def main():
     ):
         logger.info("Create idea button clicked.")
 
+
         if not form_data["description"].strip():
 
             st.error(
@@ -237,7 +238,8 @@ def main():
 
             return
 
-        payload = build_payload(form_data)
+        with st.spinner("Criando ideia..."):
+            payload = build_payload(form_data)
         # TALVEZ ADICIONAR UM PRINT DO PAYLOAD COMPLETO PARA DEBUGAR MELHOR
 
         submit(payload)
