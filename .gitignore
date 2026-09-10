@@ -3,3 +3,4 @@ ideaAI/
 *.pyc
 __pycache__/
 .streamlit/secrets.toml
+demo/.streamlit/
