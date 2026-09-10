@@ -2,6 +2,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from google import genai
+from google.genai import errors
 
 from backend.services.ai_response_parser import AIResponseParser
 from backend.services.prompt_service import PromptService
@@ -22,7 +23,8 @@ class AIService:
         client: The initialized Google GenAI client instance.
     """
 
-    MODEL_NAME = "gemini-2.5-flash"
+    PRIMARY_MODEL = "gemini-3.6-flash"
+    FALLBACK_MODEL = "gemini-2.5-flash"
 
     def __init__(self) -> None:
         """Initializes the AIService with prompt builder,
@@ -101,15 +103,42 @@ class AIService:
         Raises:
             AIServiceError: if the API call fails.
         """
-        try:
-            logger.debug("Calling Gemini model | model=%s", self.MODEL_NAME)
-            return self.client.models.generate_content(
-                model=self.MODEL_NAME,
-                contents=prompt
-            )
-        except Exception as exc:
-            logger.exception("Failed to communicate with Gemini")
-            raise AIServiceError("Failed to communicate with Gemini.") from exc
+        models_to_try = [self.PRIMARY_MODEL, self.FALLBACK_MODEL]
+
+        for index, model in enumerate(models_to_try):
+            try:
+                logger.debug("Calling Gemini model | model=%s", model)
+                return self.client.models.generate_content(
+                    model=model,
+                    contents=prompt
+                )
+            except errors.APIError as err:
+                logger.warning(
+                    "Gemini API error | model=%s | status=%s | message=%s",
+                    model,
+                    err.code,
+                    err.message,
+                )
+                is_last_model = (index == len(models_to_try)-1)
+
+                if err.code in (503, 429) and not is_last_model:
+                    logger.info("Retrying request with next fallback model...")
+                    continue
+
+                raise AIServiceError(
+                    "Gemini API request failed."
+                    ) from None
+            
+            except Exception as exc:
+                logger.exception(
+                    "Unexpected error communicating with Gemini | model=%s", model)
+                raise AIServiceError(
+                    "Unexpected error while communicating with Gemini."
+            ) from None
+
+        raise AIServiceError(
+            "All configured Gemini models failed."
+        )
 
     def _extract_text(self, response) -> str:
         """Extracts and validates the text from Gemini response.
