@@ -1,4 +1,7 @@
+"""Business workflow for creating and optionally analyzing ideas."""
+
 import logging
+from typing import Any, Mapping
 
 from backend.repositories.idea_repository import IdeaRepository
 from backend.services.ai_service import AIService
@@ -9,272 +12,128 @@ logger = logging.getLogger("olivia.services.idea")
 
 
 class IdeaService:
-    """Orchestrates the creation and analysis process of an idea.
+    """Coordinate validation, AI processing, and persistence.
 
-    Workflow:
-        1. Validate the incoming payload
-        2. Resolve AI processing requirements
-        3. Execute AI generation/refinement and analysis
-        4. Persist the main idea and 5W2H data
-        5. Persist the AI analysis, if generated
-        6. Generate the report, if requested
-        7. Return the final result to the controller
+    Attributes:
+        validation_service: Service used to validate incoming payloads.
+        repository: Repository used to persist created ideas.
+        ai_service: Optional AI service, initialized only when it is needed.
     """
 
-    def __init__(self):
-        """Initialize the services and repository."""
-
-        logger.debug("Initializing IdeaService")
-
-        self.validation_service = ValidationService()
-        self.ai_service = AIService()
-        self.repository = IdeaRepository()
-
-    def create_idea(self, payload: dict) -> dict:
-        """Create a new idea and process requested AI features.
+    def __init__(
+        self,
+        validation_service: ValidationService | None = None,
+        repository: IdeaRepository | None = None,
+        ai_service: AIService | None = None,
+    ) -> None:
+        """Initialize workflow dependencies.
 
         Args:
-            payload: Dictionary containing the idea data and processing options.
+            validation_service: Optional payload validator.
+            repository: Optional persistence repository.
+            ai_service: Optional preconfigured AI service.
+        """
+        self.validation_service = validation_service or ValidationService()
+        self.repository = repository or IdeaRepository()
+        self.ai_service = ai_service
+
+    def create_idea(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        """Create an idea and process requested AI operations.
+
+        Args:
+            payload: Form data containing idea values and processing options.
 
         Returns:
-            Dictionary containing the created idea ID and an optional report.
+            A dictionary with ``idea_id`` and an optional Markdown ``report``.
         """
-
-        logger.info("Starting idea creation")
-
-        # ==================================================
-        # 1. Validation
-        # ==================================================
-
-        logger.debug("Validating idea payload")
-
-        payload = self.validation_service.validate_payload(payload)
-
-        options = payload["options"]
-
-        logger.debug(
-            "Payload structure and types validated successfully"
-        )
-
-        # ==================================================
-        # 2. Resolve AI tasks
-        # ==================================================
-
-        ai_tasks = self._resolve_ai_tasks(payload)
-
-        analysis = None
+        validated_payload = self.validation_service.validate_payload(payload)
+        ai_tasks = self._resolve_ai_tasks(validated_payload)
+        analysis: dict[str, Any] | None = None
 
         if ai_tasks:
-            logger.info(
-                "AI processing requested | tasks=%s",
-                ai_tasks
-            )
+            logger.info("AI processing requested | tasks=%s", ai_tasks)
+            service = self.ai_service or AIService()
+            validated_payload, analysis = service.process(validated_payload, ai_tasks)
 
-            payload, analysis = self.ai_service.process(
-                payload,
-                ai_tasks
-            )
-
-        else:
-            logger.debug("No AI processing requested")
-
-        # ==================================================
-        # 3. Persist idea
-        # ==================================================
-
-        logger.debug("Persisting idea")
-
-        idea_id = self.repository.create(
-            payload["idea"]
-        )
-
-        logger.info(
-            "Idea persisted successfully | idea_id=%s",
-            idea_id
-        )
-
-        # ==================================================
-        # 4. Persist AI analysis
-        # ==================================================
-
+        self._assign_methodology_sources(validated_payload, ai_tasks)
+        idea_id = self.repository.create(validated_payload["idea"])
         report = None
+        if analysis is not None:
+            self.repository.save_analysis(idea_id, self._prepare_analysis_for_storage(analysis))
+            if validated_payload["options"]["show_report"]:
+                report = (self.ai_service or service).to_markdown(analysis)
 
-        if analysis:
+        logger.info("Idea created | idea_id=%s", idea_id)
+        return {"idea_id": idea_id, "report": report}
 
-            logger.debug(
-                "Persisting AI analysis | idea_id=%s",
-                idea_id
-            )
+    def _prepare_analysis_for_storage(self, analysis: Mapping[str, Any]) -> dict[str, Any]:
+        """Adapt the AI response to the repository storage schema.
 
-            analysis_to_save = self._prepare_analysis_for_storage(analysis)
-            logger.debug("Persisting AI analysis | idea_id=%s", idea_id)
-
-            self.repository.save_analysis(
-                idea_id=idea_id,
-                analysis=analysis_to_save
-            )
-
-            logger.info(
-                "AI analysis persisted successfully | idea_id=%s",
-                idea_id
-            )
-
-            # ==================================================
-            # 5. Generate report
-            # ==================================================
-
-            if options.get("show_report", False):
-
-                logger.debug(
-                    "Generating Markdown report | idea_id=%s",
-                    idea_id
-                )
-
-                report = self.ai_service.to_markdown(
-                    analysis
-                )
-
-        logger.info(
-            "Idea creation completed successfully | idea_id=%s",
-            idea_id
-        )
-
-        return {
-            "idea_id": idea_id,
-            "report": report,
-        }
-
-    def _prepare_analysis_for_storage(self, analysis: dict) -> dict:
-        """Convert the parsed AI analysis into the structure
-        expected by the repository.
-        
-        The AI response uses 'viability as its domain field,
-        while the database stores this value as 'score'.
-        
         Args:
-            analysis: Parsed analysis returned by AIService.
+            analysis: Validated analysis response from the AI service.
 
         Returns:
-            Dictionary containing the score and the remaining
-            analysis data.
+            A dictionary with the numeric score and separate analysis details.
         """
-
         return {
             "score": analysis["viability"],
             "analysis_data": {
-                key: value
-                for key, value in analysis.items()
-                if key != "viability"
+                key: value for key, value in analysis.items() if key != "viability"
             },
         }
 
-    # ==================================================
-    # AI Task Resolution
-    # ==================================================
+    def _assign_methodology_sources(
+        self, payload: dict[str, Any], ai_tasks: Mapping[str, Any]
+    ) -> None:
+        """Assign a persistable source to every 5W2H field.
 
-    def _resolve_ai_tasks(self, payload: dict) -> dict:
-        """Determine which operations should be performed by AI.
-
-        The method distinguishes between generating new content,
-        refining existing content, and generating a complete analysis.
+        A field is ``AI`` if it was generated or refined by an AI methodology
+        task. Every unchanged manual field is ``USER``. The obsolete
+        ``USER_EDITED_AI`` value is never produced.
 
         Args:
-            payload: Validated idea creation payload.
+            payload: Validated payload whose methodology receives the source map.
+            ai_tasks: Resolved AI operations for the current request.
+        """
+        fields = self.validation_service.REQUIRED_5W2H_FIELDS
+        methodology_task = ai_tasks.get("methodology")
+        ai_fields = set(fields) if methodology_task == "generate" else set()
+        if isinstance(methodology_task, Mapping):
+            ai_fields.update(methodology_task)
+
+        payload["idea"]["methodology"]["sources"] = {
+            field: "AI" if field in ai_fields else "USER" for field in fields
+        }
+
+    def _resolve_ai_tasks(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        """Resolve requested AI operations from a validated payload.
+
+        Args:
+            payload: Validated creation payload.
 
         Returns:
-            Dictionary describing the AI operations to execute.
+            A mapping of AI operations and their generation/refinement actions.
         """
-
         idea = payload["idea"]
         options = payload["options"]
-        ai_options = options.get("ai_options", {})
+        ai_options = options["ai_options"]
+        tasks: dict[str, Any] = {}
 
-        tasks = {}
+        if ai_options["title"]:
+            tasks["title"] = "refine" if idea["title"] else "generate"
 
-        # ==================================================
-        # Title
-        # ==================================================
-
-        if ai_options.get("title", False):
-
-            title = idea["title"].strip()
-
-            action = "refine" if title else "generate"
-
-            tasks["title"] = action
-
-            logger.debug(
-                "AI title task resolved | action=%s",
-                action
-            )
-
-        # ==================================================
-        # 5W2H
-        # ==================================================
-
-        manual_5w2h = options.get(
-            "manual_5w2h",
-            False
-        )
-
-        if not manual_5w2h:
-
+        if not options["manual_5w2h"]:
             tasks["methodology"] = "generate"
-
-            logger.debug(
-                "AI methodology task resolved | action=generate"
-            )
-
         else:
-
-            methodology_options = ai_options.get(
-                "methodology",
-                {}
-            )
-
-            methodology_data = (
-                idea
-                .get("methodology", {})
-                .get("data", {})
-            )
-
-            methodology_tasks = {}
-
-            for field, requested in methodology_options.items():
-
-                if not requested:
-                    continue
-
-                value = methodology_data.get(
-                    field,
-                    ""
-                ).strip()
-
-                action = "refine" if value else "generate"
-
-                methodology_tasks[field] = action
-
-                logger.debug(
-                    "AI methodology task resolved | "
-                    "field=%s | action=%s",
-                    field,
-                    action
-                )
-
+            methodology_data = idea["methodology"]["data"]
+            methodology_tasks = {
+                field: "refine" if methodology_data[field] else "generate"
+                for field, requested in ai_options["methodology"].items()
+                if requested
+            }
             if methodology_tasks:
-
                 tasks["methodology"] = methodology_tasks
 
-        # ==================================================
-        # Full Analysis
-        # ==================================================
-
-        if options.get("generate_analysis", False):
-
+        if options["generate_analysis"]:
             tasks["analysis"] = True
-
-            logger.debug(
-                "AI analysis task resolved | generate_analysis=True"
-            )
-
         return tasks

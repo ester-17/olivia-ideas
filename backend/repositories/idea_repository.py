@@ -1,125 +1,182 @@
+"""Persistence operations for ideas and AI analyses."""
+
 import json
+from typing import Any, Mapping
+
 from backend.database.connection import DatabaseConnection
 
+
 class IdeaRepositoryError(Exception):
-    """
-    Raised when an error occurs while persisting idea data.
-    """
-    pass
+    """Raised when an idea or its analysis cannot be persisted."""
+
 
 class IdeaRepository:
+    """Persist ideas, their 5W2H data, and generated analyses.
+
+    Attributes:
+        database: Connection manager used by repository operations.
     """
-    Handles database persistence for ideas, 5W2H methodology,
-    and AI-generated analyses.    """
 
-    def __init__(self):
-        self.database = DatabaseConnection()
+    METHODOLOGY_FIELDS = (
+        "what",
+        "why",
+        "where",
+        "when",
+        "who",
+        "how",
+        "how_much",
+    )
+    ALLOWED_SOURCES = frozenset({"USER", "AI"})
 
-    # --------------------------------------------------
-    # Public methods
-    # --------------------------------------------------
-    def create(self, idea: dict):
+    def __init__(self, database: DatabaseConnection | None = None) -> None:
+        """Initialize the repository.
+
+        Args:
+            database: Optional connection manager, primarily for dependency injection.
         """
-        Persist an idea and its 5W2H data within a single atomic transaction.
+        self.database = database or DatabaseConnection()
 
-        Returns the created idea ID or raises IdeaRepositoryError on failure.
+    def create(self, idea: Mapping[str, Any]) -> int:
+        """Persist an idea and its 5W2H information atomically.
+
+        Args:
+            idea: Validated idea data containing title, description, and methodology.
+
+        Returns:
+            The generated idea identifier.
+
+        Raises:
+            IdeaRepositoryError: If any insert or transaction operation fails.
         """
         cursor = self.database.get_cursor()
         try:
-            idea_id = self._insert_idea(
-                cursor,
-                idea
-            )
+            idea_id = self._insert_idea(cursor, idea)
+            methodology = idea["methodology"]
             self._insert_5w2h(
                 cursor,
                 idea_id,
-                idea["methodology"]["data"]
+                methodology["data"],
+                methodology["sources"],
             )
             self.database.commit()
             return idea_id
-        
-        except Exception as e:
+        except Exception as exc:
             self.database.rollback()
-            raise IdeaRepositoryError(
-                f"Failed to create idea: {str(e)}."
-                ) from e
-        
+            raise IdeaRepositoryError("Failed to create idea.") from exc
         finally:
             self.database.close_cursor(cursor)
             self.database.close_connection()
 
-    def save_analysis(self, idea_id: int, analysis: dict) -> None:
-        """
-        Persists the AI-generated structured analysis for a specific idea.
+    def save_analysis(self, idea_id: int, analysis: Mapping[str, Any]) -> None:
+        """Persist a structured AI analysis for an idea.
+
+        Args:
+            idea_id: Identifier of the persisted idea.
+            analysis: Analysis containing a numeric score and JSON-serializable details.
+
+        Raises:
+            IdeaRepositoryError: If the analysis cannot be saved.
         """
         cursor = self.database.get_cursor()
         try:
             self._insert_analysis(cursor, idea_id, analysis)
-
             self.database.commit()
-
-        except Exception as e:
+        except Exception as exc:
             self.database.rollback()
-
-            raise IdeaRepositoryError(
-                f"Failed to save analysis: {str(e)}."
-            ) from e
-
+            raise IdeaRepositoryError("Failed to save analysis.") from exc
         finally:
             self.database.close_cursor(cursor)
             self.database.close_connection()
 
-    # --------------------------------------------------
-    # Private methods
-    # --------------------------------------------------
+    def _insert_idea(self, cursor: Any, idea: Mapping[str, Any]) -> int:
+        """Insert the primary idea record.
 
-    def _insert_idea(self, cursor, idea: dict) -> int:
+        Args:
+            cursor: Cursor used to execute the statement.
+            idea: Validated idea data.
+
+        Returns:
+            The generated identifier.
         """
-        Inserts the main idea record and returns the generated ID.
-        """
-        sql = """
-            INSERT INTO ideas(title, description)
-            VALUES(%s, %s)
-            """
-        values = (
-            idea["title"],
-            idea["description"],
+        cursor.execute(
+            "INSERT INTO ideas (title, description) VALUES (%s, %s)",
+            (idea["title"], idea["description"]),
         )
-        cursor.execute(sql, values)
-        return cursor.lastrowid
+        return int(cursor.lastrowid)
 
-    def _insert_5w2h(self, cursor, idea_id: int, data: dict) -> None:
-        """
-        Inserts the 5W2H methodology fields linked to the given idea ID.
-        """
-        sql = """
-            INSERT INTO idea_5w2h(
-                idea_id, what, why, where_location,
-                when_info, who, how, how_much
-            )
-            VALUES(%s, %s, %s, %s, %s, %s, %s, %s)
-            """
-        values = (
-            idea_id,      data["what"],data["why"], data["where"],
-            data["when"], data["who"], data["how"], data["how_much"],
-        )
-        cursor.execute(sql, values)
+    def _insert_5w2h(
+        self,
+        cursor: Any,
+        idea_id: int,
+        data: Mapping[str, str],
+        sources: Mapping[str, str],
+    ) -> None:
+        """Insert methodology data associated with an idea.
 
-    def _insert_analysis(self, cursor, idea_id: int, analysis: dict) -> None:
+        Args:
+            cursor: Cursor used to execute the statement.
+            idea_id: Identifier of the idea.
+            data: Validated 5W2H values.
+            sources: Origin for each value. A manually preserved value is ``USER``;
+                any value generated or refined by AI is ``AI``.
+
+        Raises:
+            IdeaRepositoryError: If a source is not exactly ``USER`` or ``AI``.
         """
-        Serializes and inserts the analysis dictionary as a JSON string.
-        """
-        sql = """
-            INSERT INTO ai_analysis(
+        validated_sources = self._validate_sources(sources)
+        cursor.execute(
+            """INSERT INTO idea_5w2h
+            (idea_id, what, what_source, why, why_source, where_location,
+             where_location_source, when_info, when_source, who, who_source,
+             how, how_source, how_much, how_much_source)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (
                 idea_id,
-                score,
-                analysis_data
-            )
-            VALUES(%s, %s, %s)
-        """
-        values = (
-            idea_id,
-            analysis["score"],
-            json.dumps(analysis, ensure_ascii=False)
+                data["what"], validated_sources["what"],
+                data["why"], validated_sources["why"],
+                data["where"], validated_sources["where"],
+                data["when"], validated_sources["when"],
+                data["who"], validated_sources["who"],
+                data["how"], validated_sources["how"],
+                data["how_much"], validated_sources["how_much"],
+            ),
         )
-        cursor.execute(sql, values)
+
+    def _validate_sources(self, sources: Mapping[str, str]) -> dict[str, str]:
+        """Validate and normalize 5W2H source values before persistence.
+
+        A field keeps ``USER`` only when no AI operation changed it. Generated and
+        refined values use ``AI``; ``USER_EDITED_AI`` is intentionally unsupported.
+
+        Args:
+            sources: Source values keyed by the canonical 5W2H field names.
+
+        Returns:
+            A complete mapping containing only ``USER`` or ``AI``.
+
+        Raises:
+            IdeaRepositoryError: If a field is missing or has an unsupported source.
+        """
+        invalid_fields = [
+            field
+            for field in self.METHODOLOGY_FIELDS
+            if sources.get(field) not in self.ALLOWED_SOURCES
+        ]
+        if invalid_fields:
+            raise IdeaRepositoryError(
+                "Invalid 5W2H source for fields: " + ", ".join(invalid_fields)
+            )
+        return {field: sources[field] for field in self.METHODOLOGY_FIELDS}
+
+    def _insert_analysis(self, cursor: Any, idea_id: int, analysis: Mapping[str, Any]) -> None:
+        """Insert a JSON-serialized analysis.
+
+        Args:
+            cursor: Cursor used to execute the statement.
+            idea_id: Identifier of the idea.
+            analysis: Storage-ready analysis data.
+        """
+        cursor.execute(
+            "INSERT INTO ai_analysis (idea_id, score, analysis_data) VALUES (%s, %s, %s)",
+            (idea_id, analysis["score"], json.dumps(analysis["analysis_data"], ensure_ascii=False)),
+        )

@@ -13,7 +13,7 @@ Retorne o resultado no campo:
  
 A ideia já possui um título.
 Refine o título mantendo sua essência e intenção original.
-Não altere o significado da idea
+Não altere o significado da ideia.
 Retorne o resultado no campo:
 
 "title"
