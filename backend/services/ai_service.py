@@ -1,5 +1,9 @@
+"""Integration with the Google GenAI service."""
+
 import logging
 import os
+from typing import Any, Mapping
+
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors
@@ -12,7 +16,6 @@ load_dotenv()
 
 class AIServiceError(Exception):
     """Raised when the AI communication, generation, or parsing fails."""
-    pass
 
 class AIService:
     """Manages all interactions with the Gemini AI service.
@@ -35,7 +38,9 @@ class AIService:
         self.parser = AIResponseParser()
         self.client = self._create_client()
 
-    def process(self, payload: dict, ai_tasks: dict) -> tuple[dict, dict | None]:
+    def process(
+        self, payload: dict[str, Any], ai_tasks: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         """Executes all requested AI tasks and analysis in a single request.
 
         Args:
@@ -74,7 +79,18 @@ class AIService:
             logger.debug("Updated payload title from AI response")
 
         if "methodology" in ai_tasks and "fivew2h" in parsed_response:
-            payload["idea"]["methodology"]["data"].update(parsed_response["fivew2h"])
+            methodology_task = ai_tasks["methodology"]
+            generated_data = parsed_response["fivew2h"]
+            if methodology_task == "generate":
+                payload["idea"]["methodology"]["data"].update(generated_data)
+            else:
+                requested_fields = methodology_task.keys()
+                payload["idea"]["methodology"]["data"].update(
+                    {
+                        field: generated_data[field]
+                        for field in requested_fields
+                    }
+                )
             logger.debug("Updated payload 5W2H methodology from AI response")
 
         # 5. Extract internal analysis payload if requested
@@ -87,17 +103,7 @@ class AIService:
 
         return payload, analysis
 
-    def _prepare_analysis(self, analysis: dict) -> dict:
-        return {
-            "score": analysis["viability"],
-            "analysis_data": {
-                key: value
-                for key, value in analysis.items()
-                if key != "viability"
-            },
-        }
-
-    def to_markdown(self, analysis) -> str:
+    def to_markdown(self, analysis: Mapping[str, Any]) -> str:
         """Converts the parsed analysis object into Markdown format.
 
         Args:
@@ -108,7 +114,7 @@ class AIService:
         """
         return self.parser.to_markdown(analysis)
 
-    def _call_model(self, prompt: str):
+    def _call_model(self, prompt: str) -> Any:
         """Sends a prompt to Gemini model.
 
         Args:
@@ -120,7 +126,7 @@ class AIService:
         Raises:
             AIServiceError: if the API call fails.
         """
-        models_to_try = [self.PRIMARY_MODEL, self.FALLBACK_MODEL]
+        models_to_try = (self.PRIMARY_MODEL, self.FALLBACK_MODEL)
 
         for index, model in enumerate(models_to_try):
             try:
@@ -136,7 +142,7 @@ class AIService:
                     err.code,
                     err.message,
                 )
-                is_last_model = (index == len(models_to_try)-1)
+                is_last_model = index == len(models_to_try) - 1
 
                 if err.code in (503, 429) and not is_last_model:
                     logger.info("Retrying request with next fallback model...")
@@ -157,7 +163,7 @@ class AIService:
             "All configured Gemini models failed."
         )
 
-    def _extract_text(self, response) -> str:
+    def _extract_text(self, response: Any) -> str:
         """Extracts and validates the text from Gemini response.
 
         Args:

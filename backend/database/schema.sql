@@ -11,7 +11,9 @@ CREATE TABLE ideas (
     id INT PRIMARY KEY AUTO_INCREMENT,
     
     -- N:1 relationship: each idea belongs to one user
-    user_id INT NOT NULL,
+    -- Authentication is not part of the current application flow. Keep the
+    -- relationship optional so ideas can be created before user management.
+    user_id INT NULL,
 
     title VARCHAR(150) NOT NULL,
     description TEXT,
@@ -30,6 +32,7 @@ CREATE TABLE ideas (
 
     FOREIGN KEY (user_id)
         REFERENCES users(id)
+        ON DELETE SET NULL
 );
 
 CREATE TABLE idea_5w2h (
@@ -39,25 +42,25 @@ CREATE TABLE idea_5w2h (
     idea_id INT NOT NULL UNIQUE,
 
     what TEXT,
-    what_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    what_source ENUM('USER', 'AI'),
 
     why TEXT,
-    why_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    why_source ENUM('USER', 'AI'),
 
     where_location TEXT,
-    where_location_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    where_location_source ENUM('USER', 'AI'),
 
     when_info TEXT,
-    when_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    when_source ENUM('USER', 'AI'),
 
     who TEXT,
-    who_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    who_source ENUM('USER', 'AI'),
 
     how TEXT,
-    how_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    how_source ENUM('USER', 'AI'),
 
     how_much TEXT,
-    how_much_source ENUM('USER', 'AI', 'USER_EDITED_AI'),
+    how_much_source ENUM('USER', 'AI'),
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -84,4 +87,4 @@ CREATE TABLE ai_analysis (
     FOREIGN KEY (idea_id)
         REFERENCES ideas(id)
         ON DELETE CASCADE
-)
+);

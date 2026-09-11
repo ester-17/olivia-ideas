@@ -1,3 +1,8 @@
+"""Prompt fragments for generating or refining a 5W2H methodology."""
+
+from collections.abc import Mapping
+
+
 METHODOLOGY_FIELDS = {
     "what": "O que?",
     "why": "Por quê?",
@@ -8,7 +13,19 @@ METHODOLOGY_FIELDS = {
     "how_much": "Quanto?"
 }
 
-def build_methodology_prompt(tasks):
+
+def build_methodology_prompt(tasks: str | Mapping[str, str]) -> str:
+    """Build instructions for requested 5W2H operations.
+
+    Args:
+        tasks: ``"generate"`` for all fields or a mapping from field to action.
+
+    Returns:
+        Prompt fragment describing only the requested methodology work.
+
+    Raises:
+        ValueError: If a field action is not ``generate`` or ``refine``.
+    """
     if tasks == "generate":
         return """
 ## 5W2H
@@ -49,6 +66,8 @@ Preencha:
                 f"- {field} ({field_name}): "
                 "refine o conteúdo existente mantendo sua intenção."
             )
+        else:
+            raise ValueError(f"Unsupported methodology action: {action}")
 
     return f"""
 ## 5W2H

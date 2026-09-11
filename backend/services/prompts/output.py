@@ -14,7 +14,7 @@ Se a tarefa de título for solicitada:
 
 ### 5W2H
 
-Se a tarefa de título for solicitada:
+Se a tarefa de 5W2H for solicitada:
 {
     "fivew2h": {
         "what": "...",
@@ -41,7 +41,7 @@ Se a análise for solicitada:
     }
 }
 
-Não inclue blocos que não foram solicitados.
+Não inclua blocos que não foram solicitados.
 Não altere informações que não fazem parte da tarefa.
 Não adicione explicações, Markdown ou texto fora do JSON.
 """
