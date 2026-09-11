@@ -68,9 +68,11 @@ class AIResponseParser:
         # 1. Validate Title (if present in the response)
         if "title" in data and data["title"] is not None:
             logger.debug("Validating title field")
+
             if not isinstance(data["title"], str):
                 logger.error("Field 'title' must be a string.")
                 raise AIResponseParserError("Field 'title' must be a string.")
+            
             if not data["title"].strip():
                 logger.error("Field 'title' cannot be empty.")
                 raise AIResponseParserError("Field 'title' cannot be empty.")
@@ -175,7 +177,7 @@ class AIResponseParser:
                 logger.error(f"Field '{field}' in analysis cannot be empty.")
                 raise AIResponseParserError(f"Field '{field}' in analysis cannot be empty.")
 
-            if expected_type is int and not (0 <= value <= 100):
+            if expected_type is int and not (0 <= value <= 10):
                 logger.error(f"Field '{field}' in analysis must be between 0 and 100.")
                 raise AIResponseParserError(f"Field '{field}' in analysis must be between 0 and 100.")
 
@@ -224,7 +226,7 @@ class AIResponseParser:
         return cleandoc(f"""
             ## Viabilidade
 
-            **Pontuação:** {analysis['viability']}/100
+            **Pontuação:** {analysis['viability']}/10
         """)
 
     def _markdown_target_audience(self, analysis: dict) -> str:
@@ -235,25 +237,31 @@ class AIResponseParser:
         """)
 
     def _markdown_risks(self, analysis: dict) -> str:
-        items = "\n".join(f"- {risk}" for risk in analysis["risks"])
-        return cleandoc(f"""
-            ## Riscos
+        items = "\n".join(
+            f"- {risk}"
+            for risk in analysis["risks"]
+            )
+        return f"""
+## Riscos
 
-            {items}
-        """)
+{items}
+"""
 
     def _markdown_competitors(self, analysis: dict) -> str:
-        items = "\n".join(f"- {competitor}" for competitor in analysis["competitors"])
-        return cleandoc(f"""
-            ## Concorrentes
+        items = "\n".join(
+            f"- {competitor}"
+            for competitor in analysis["competitors"]
+        )
+        return f"""
+## Concorrentes
 
-            {items}
-        """)
+{items}
+"""
 
     def _markdown_next_steps(self, analysis: dict) -> str:
         items = "\n".join(f"- {step}" for step in analysis["next_steps"])
-        return cleandoc(f"""
-            ## Próximos Passos
+        return f"""
+## Próximos Passos
 
-            {items}
-        """)
+{items}
+"""

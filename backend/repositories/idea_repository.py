@@ -112,12 +112,14 @@ class IdeaRepository:
         sql = """
             INSERT INTO ai_analysis(
                 idea_id,
-                analysis
+                score,
+                analysis_data
             )
-            VALUES(%s, %s)
+            VALUES(%s, %s, %s)
         """
         values = (
             idea_id,
+            analysis["score"],
             json.dumps(analysis, ensure_ascii=False)
         )
         cursor.execute(sql, values)

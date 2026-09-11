@@ -9,16 +9,16 @@ logger = logging.getLogger("olivia.services.idea")
 
 
 class IdeaService:
-    """
-    Orchestrates the creation and analysis process of an idea.
+    """Orchestrates the creation and analysis process of an idea.
 
     Workflow:
-        1. Validate the incoming payload.
-        2. Resolve AI processing requirements.
-        3. Execute AI generation/refinement and analysis in a single request.
-        4. Persist the main idea and 5W2H data.
-        5. Persist the AI analysis, if generated.
-        6. Return the final result to the controller.
+        1. Validate the incoming payload
+        2. Resolve AI processing requirements
+        3. Execute AI generation/refinement and analysis
+        4. Persist the main idea and 5W2H data
+        5. Persist the AI analysis, if generated
+        6. Generate the report, if requested
+        7. Return the final result to the controller
     """
 
     def __init__(self):
@@ -31,8 +31,7 @@ class IdeaService:
         self.repository = IdeaRepository()
 
     def create_idea(self, payload: dict) -> dict:
-        """
-        Create a new idea and process requested AI features.
+        """Create a new idea and process requested AI features.
 
         Args:
             payload: Dictionary containing the idea data and processing options.
@@ -63,20 +62,21 @@ class IdeaService:
 
         ai_tasks = self._resolve_ai_tasks(payload)
 
+        analysis = None
+
         if ai_tasks:
             logger.info(
                 "AI processing requested | tasks=%s",
                 ai_tasks
             )
 
-            payload, analysis_data = self.ai_service.process(
+            payload, analysis = self.ai_service.process(
                 payload,
                 ai_tasks
             )
 
         else:
             logger.debug("No AI processing requested")
-            analysis_data = None
 
         # ==================================================
         # 3. Persist idea
@@ -99,16 +99,19 @@ class IdeaService:
 
         report = None
 
-        if analysis_data:
+        if analysis:
 
             logger.debug(
                 "Persisting AI analysis | idea_id=%s",
                 idea_id
             )
 
+            analysis_to_save = self._prepare_analysis_for_storage(analysis)
+            logger.debug("Persisting AI analysis | idea_id=%s", idea_id)
+
             self.repository.save_analysis(
                 idea_id=idea_id,
-                analysis=analysis_data
+                analysis=analysis_to_save
             )
 
             logger.info(
@@ -128,7 +131,7 @@ class IdeaService:
                 )
 
                 report = self.ai_service.to_markdown(
-                    analysis_data
+                    analysis
                 )
 
         logger.info(
@@ -141,13 +144,36 @@ class IdeaService:
             "report": report,
         }
 
+    def _prepare_analysis_for_storage(self, analysis: dict) -> dict:
+        """Convert the parsed AI analysis into the structure
+        expected by the repository.
+        
+        The AI response uses 'viability as its domain field,
+        while the database stores this value as 'score'.
+        
+        Args:
+            analysis: Parsed analysis returned by AIService.
+
+        Returns:
+            Dictionary containing the score and the remaining
+            analysis data.
+        """
+
+        return {
+            "score": analysis["viability"],
+            "analysis_data": {
+                key: value
+                for key, value in analysis.items()
+                if key != "viability"
+            },
+        }
+
     # ==================================================
     # AI Task Resolution
     # ==================================================
 
     def _resolve_ai_tasks(self, payload: dict) -> dict:
-        """
-        Determine which operations should be performed by AI.
+        """Determine which operations should be performed by AI.
 
         The method distinguishes between generating new content,
         refining existing content, and generating a complete analysis.
