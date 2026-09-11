@@ -36,10 +36,10 @@ class AIService:
         self.client = self._create_client()
 
     def process(self, payload: dict, ai_tasks: dict) -> tuple[dict, dict | None]:
-        """Executes all requested AI tasks and analysis in a single Ai call.
+        """Executes all requested AI tasks and analysis in a single request.
 
         Args:
-            payload:Validated idea payload.
+            payload: Validated idea payload.
             ai_tasks: Dictionary containing resolved AI tasks.
 
         Returns:
@@ -53,18 +53,22 @@ class AIService:
         logger.info("Processing single-pass AI tasks | tasks=%s", ai_tasks)
 
         # 1. Build unified prompt
+        logger.debug("Building AI prompt")
         prompt = self.prompt_service.build(payload, ai_tasks)
 
         # 2. Call Gemini model
+        logger.debug("Sending request to Gemini")
         response = self._call_model(prompt)
-        text = self._extract_text(response)
 
-        # 3. Parse JSON response
+        # 3. Extract response text
+        text = self._extract_text(response)
         logger.debug("Raw AI response | text=%r", text)
+
+        # 4. Parse JSON response
         parsed_response = self.parser.parse(text)
         logger.debug("AI response parsed successfully")
 
-        # 4. Update payload with generated/refined fields
+        # 5. Update payload with generated/refined fields
         if "title" in ai_tasks and "title" in parsed_response:
             payload["idea"]["title"] = parsed_response["title"]
             logger.debug("Updated payload title from AI response")
@@ -74,11 +78,24 @@ class AIService:
             logger.debug("Updated payload 5W2H methodology from AI response")
 
         # 5. Extract internal analysis payload if requested
-        analysis_data = parsed_response.get(
+        analysis = parsed_response.get(
             "analysis"
         ) if ai_tasks.get("analysis") else None
 
-        return payload, analysis_data
+        if analysis:
+            logger.debug("AI analysis extracted successfully")
+
+        return payload, analysis
+
+    def _prepare_analysis(self, analysis: dict) -> dict:
+        return {
+            "score": analysis["viability"],
+            "analysis_data": {
+                key: value
+                for key, value in analysis.items()
+                if key != "viability"
+            },
+        }
 
     def to_markdown(self, analysis) -> str:
         """Converts the parsed analysis object into Markdown format.
@@ -158,7 +175,7 @@ class AIService:
 
         if not hasattr(response, "text"):
             logger.error("Invalid response structure from Gemini")
-            raise AIServiceError("Resposta inválida recebida da IA.")
+            raise AIServiceError("Invalid response received from the AI service.")
 
         if not response.text:
             logger.error("Empty response text from Gemini")
@@ -173,6 +190,9 @@ class AIService:
 
         Returns:
             An initialized Google GenAI client.
+
+        Raises:
+            AIServiceError: If the API key is unavailable.
         """
         logger.debug("Creating Google GenAI client")
         api_key = self._get_api_key()
