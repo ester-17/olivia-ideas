@@ -1,122 +1,59 @@
-# Database
+# Banco de dados
 
-## Banco de dados
+## Estratégia de modelagem
 
-O projeto utiliza **MySQL** para persistência dos dados.
+OlivIA Ideas usa MySQL com modelagem híbrida: entidades com relações previsíveis são relacionais; conteúdo variável de análise por IA é armazenado em JSON. O schema canônico está em [`backend/database/schema.sql`](../backend/database/schema.sql).
 
-A modelagem foi planejada para separar as principais entidades da aplicação, garantindo integridade referencial e flexibilidade para o armazenamento de relatórios gerados por Inteligência Artificial.
-
-## DER
-
-![Diagrama ER do Banco de Dados](assets/der.png)
-
-<details>
-<summary>🔍 Clique para ver a versão simplificada em texto (ASCII)</summary>
+## Modelo relacional
 
 ```text
-┌─────────────────┐
-│      users      │
-├─────────────────┤
-│ PK id           │
-│ name            │
-│ email           │
-│ password_hash   │
-│ created_at      │
-└────────┬────────┘
-         │ 1
-         │
-         │ N
-┌────────▼────────┐
-│      ideas      │
-├─────────────────┤
-│ PK id           │
-│ FK user_id      │
-│ title           │
-│ description     │
-│ category        │
-│ status          │
-│ created_at      │
-│ updated_at      │
-└───────┬─────┬───┘
-        │1    │1
-        │     │
-        │     │N
-        │     ▼
-        │ ┌─────────────────────────┐
-        │ │       ai_analysis       │
-        │ ├─────────────────────────┤
-        │ │ PK id                   │
-        │ │ FK idea_id              │
-        │ │ score                   │
-        │ │ analysis_data (JSON)    │
-        │ │ created_at              │
-        │ └─────────────────────────┘
-        │
-        │1
-        │
-        │1
-┌───────▼────────────────┐
-│       idea_5w2h        │
-├────────────────────────┤
-│ PK id                  │
-│ FK idea_id             │
-│                        │
-│ what                   │
-│ what_source            │
-│ why                    │
-│ why_source             │
-│ where_location         │
-│ where_location_source  │
-│ when_info              │
-│ when_source            │
-│ who                    │
-│ who_source             │
-│ how                    │
-│ how_source             │
-│ how_much               │
-│ how_much_source        │
-│ created_at             │
-│ updated_at             │
-└────────────────────────┘
+users (1) ──────< ideas (1) ────── (1) idea_5w2h
+                    │
+                    └────────────< ai_analysis
 ```
-</details>
 
-### Principais entidades
+`ideas.user_id` é opcional enquanto autenticação não integra o fluxo ativo. Isso permite criar ideias sem conta e preserva a relação para evolução futura.
 
-#### `users`
+## Tabelas
 
-Armazena os usuários da aplicação e prepara a estrutura para autenticação futura.
+### `users`
 
-#### `ideas`
+Reserva a identidade para autenticação futura: `id`, `user_name`, `email`, `password_hash` e `created_at`.
 
-Armazena as ideias criadas pelos usuários, incluindo título, descrição, categoria, status e datas de criação/atualização.
+### `ideas`
 
-#### `idea_5w2h`
+Entidade principal com `title`, `description`, `status`, timestamps e futura associação opcional com `users`.
 
-Armazena o planejamento 5W2H relacionado à ideia.
+### `idea_5w2h`
 
-#### `ai_analysis`
+Possui relação 1:1 com `ideas` por `idea_id UNIQUE`. Mantém os sete campos 5W2H e sua origem:
 
-Armazena informações relacionadas às análises geradas pela IA, incluindo conteúdo estruturado em JSON.
+| Campo | Valor | Origem |
+| --- | --- | --- |
+| What | `what` | `what_source` |
+| Why | `why` | `why_source` |
+| Where | `where_location` | `where_location_source` |
+| When | `when_info` | `when_source` |
+| Who | `who` | `who_source` |
+| How | `how` | `how_source` |
+| How much | `how_much` | `how_much_source` |
 
-### Modelagem híbrida
+Cada origem é `ENUM('USER', 'AI')`. `USER` representa conteúdo manual inalterado; `AI` representa conteúdo gerado ou refinado pelo Gemini. O estado `USER_EDITED_AI` não é usado nesta versão.
 
-As respostas da IA podem evoluir conforme os prompts e as funcionalidades do sistema também evoluem.
+### `ai_analysis`
 
-Por isso, o projeto utiliza uma abordagem híbrida:
+Mantém múltiplas análises por ideia. `score` armazena viabilidade numérica para consultas simples; `analysis_data` guarda conteúdo estruturado — problema, público, riscos, concorrentes e próximos passos — em JSON.
 
-- **Dados relacionais** para informações estruturadas e previsíveis.
-- **JSON** para conteúdos de IA que podem possuir estruturas variáveis.
+## Motivo da modelagem híbrida
 
-Essa abordagem busca reduzir a necessidade de alterações frequentes no esquema do banco conforme novas seções de análise forem adicionadas.
+Título, 5W2H e origem possuem formato estável, integridade referencial e valor para filtros futuros; portanto são relacionais. A análise pode ganhar seções conforme prompts e produto evoluem. JSON evita migração para cada atributo novo, preservando `score` como campo de consulta direta.
 
-## Modelagem de dados
-O OlivIA Ideas foi projetado para permitir a evolução dos prompts de IA sem exigir alterações frequentes no banco de dados.
+## Persistência e transações
 
-Os dados fundamentais da aplicação (usuários, ideias e planejamento 5W2H) são armazenados em estruturas relacionais tradicionais.
+`IdeaRepository.create()` insere `ideas` e `idea_5w2h` em uma transação. Falhas provocam rollback. `save_analysis()` executa uma transação própria após a criação bem-sucedida.
 
-Já os resultados das análises de IA utilizam uma abordagem híbrida:
-- Campos críticos e frequentemente consultados são armazenados de forma estruturada.
-- Informações variáveis e dependentes da versão do prompt são armazenadas em formato JSON.
+Antes do insert, o repositório exige que os sete valores de origem existam e pertençam a `{USER, AI}`. Essa validação complementa o `ENUM` do banco e identifica violações de contrato antes do SQL.
 
-Essa abordagem permite adicionar novas seções de análise futuramente sem a necessidade de migrações constantes no banco de dados.
+## ERD visual
+
+O diagrama histórico está em [assets/der.png](assets/der.png). O DDL versionado é a fonte de verdade para nomes de colunas, nulidade e ENUMs.
