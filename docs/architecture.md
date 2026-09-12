@@ -1,196 +1,76 @@
-# Architecture
+# Arquitetura
 
-## 🏛️ Visão Geral e Fluxo da Arquitetura
+## Visão geral
 
-```text
-┌─────────────────────────────┐
-│          Streamlit          │
-│    Camada de Apresentação   │
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│         Controllers         │
-│     Controle do fluxo       │
-└──────────────┬──────────────┘
-               │
-               ▼
-┌─────────────────────────────┐
-│           Services          │
-│       Regras de negócio     │
-│       Validação / IA        │
-└───────┬─────────────┬───────┘
-        │             │
-        ▼             ▼
-┌──────────────┐ ┌──────────────┐
-│ Repositories │ │  AI Service  │
-│  Persistência│ │    Gemini    │
-└───────┬──────┘ └──────────────┘
-        │
-        ▼
-┌─────────────────────────────┐
-│            MySQL            │
-└─────────────────────────────┘
-```
-
-<details>
-
-<summary><h2>Fluxo de criação de uma ideia</h2></summary>
-
-O fluxo atual de criação segue aproximadamente esta sequência:
+OlivIA Ideas usa arquitetura em camadas inspirada em MVC. Streamlit cumpre o papel de View; o controller recebe a intenção da tela; services coordenam regras de negócio e integrações; repositories isolam SQL e transações.
 
 ```text
-Usuário
-   │
-   ▼
-Streamlit
-   │
-   ▼
-CreateIdeaController
-   │
-   ▼
-IdeaService
-   │
-   ├──► ValidationService
-   │
-   ▼
-IdeaRepository
-   │
-   ▼
-MySQL
+┌──────────────┐    ┌────────────┐    ┌─────────────────────┐
+│ Streamlit UI │───▶│ Controller │───▶│    IdeaService      │
+└──────────────┘    └────────────┘    └───────┬─────────────┘
+                                               │
+                         ┌─────────────────────┼────────────────────┐
+                         ▼                     ▼                    ▼
+                ValidationService        AIService            IdeaRepository
+                                              │                    │
+                                       PromptService/Parser       MySQL
+                                              │
+                                           Gemini API
 ```
 
-Quando a IA estiver habilitada no fluxo:
+Essa separação impede que a interface conheça SQL, que a persistência conheça a API externa e que regras de negócio sejam distribuídas entre telas.
+
+## Fluxo Create + IA
+
+1. `frontend/pages/create.py` coleta título, descrição, opções de IA e dados 5W2H.
+2. `build_payload()` converte o estado da tela no contrato de entrada do backend.
+3. `CreateIdeaController.create_idea()` delega o caso de uso a `IdeaService`.
+4. `ValidationService` valida estrutura, tipos e campos obrigatórios.
+5. `IdeaService` resolve tarefas: gerar/refinar título, gerar/refinar 5W2H e analisar.
+6. Se necessário, `AIService` monta o prompt, chama Gemini e `AIResponseParser` valida o JSON.
+7. O service marca `AI` para campos gerados/refinados e `USER` para valores manuais preservados.
+8. `IdeaRepository` persiste ideia e 5W2H na mesma transação; análises são persistidas e podem ser renderizadas em Markdown.
+
+O caminho “Salvar apenas” passa por validação e banco, sem criar um cliente Gemini.
+
+## Responsabilidades por camada
+
+### View — `frontend/pages`
+
+Renderiza a interface, coleta entradas, constrói payload e mostra feedback. Não executa SQL ou integrações externas.
+
+### Controller — `backend/controllers`
+
+É a porta de entrada do caso de uso. `CreateIdeaController` recebe o payload e encaminha a execução, mantendo a UI desacoplada do service.
+
+### Services — `backend/services`
+
+- `ValidationService`: valida contrato e tipos.
+- `IdeaService`: orquestra criação e atribui a origem do 5W2H.
+- `AIService`: integra Gemini e aplica fallback para erros transitórios.
+- `PromptService`: compõe instruções modulares.
+- `AIResponseParser`: valida JSON e produz relatório Markdown.
+
+### Repository e banco — `backend/repositories` e `backend/database`
+
+`IdeaRepository` encapsula SQL. `DatabaseConnection` gerencia cursor, commit, rollback e encerramento. Essa camada não decide quando chamar IA.
+
+## Contratos e limites
+
+O payload é a fronteira entre View e backend. Widgets Streamlit não vazam para services: o contrato usa `idea`, `options`, `methodology.data` e `methodology.sources`. Respostas do Gemini são validadas antes de alterar o payload.
+
+Exceções específicas preservam o contexto da falha por camada, e logs estruturados permitem diagnóstico sem registrar segredos.
+
+## Estrutura vigente
 
 ```text
-IdeaService
-   │
-   ├──► AIService
-   │       │
-   │       ├──► PromptService
-   │       │
-   │       └──► Gemini API
-   │
-   ├──► AIResponseParser
-   │
-   └──► IdeaRepository
-             │
-             ▼
-           MySQL
+backend/
+├── controllers/create_idea_controller.py
+├── database/{connection.py,schema.sql}
+├── repositories/idea_repository.py
+├── services/{ai_response_parser.py,ai_service.py,idea_service.py,prompt_service.py,validation_service.py,prompts/}
+└── utils/logger.py
+frontend/pages/{hero.py,create.py}
 ```
 
-Essa separação permite que a lógica da IA não fique diretamente acoplada à interface.
-
-</details>
-
-<details>
-
-<summary><h2>Responsabilidades das camadas</h2></summary>
-
-### Presentation / Streamlit
-
-Responsável pela interface e pela interação com o usuário.
-
-### Controllers
-
-Recebem os dados da camada de apresentação e delegam a execução para os Services.
-
-Exemplo:
-
-```text
-CreateIdeaController
-```
-
-### Services
-
-Concentram regras de negócio e orquestram o fluxo da aplicação.
-
-Exemplos:
-
-```text
-IdeaService
-ValidationService
-AIService
-AIResponseParser
-PromptService
-PDFService
-```
-
-### Repositories
-
-Responsáveis pela persistência e comunicação com o banco de dados.
-
-Exemplos:
-
-```text
-IdeaRepository
-UserRepository
-AIRepository
-```
-
-</details>
-
-<details>
-
-<summary><h2>Estrutura de pastas</h2></summary>
-
-```text
-OlivIA Ideas/
-│
-├── backend/
-│   ├── controllers/
-│   │   ├── chat_idea_controller.py
-│   │   ├── create_idea_controller.py
-│   │   ├── edit_idea_controller.py
-│   │   └── list_idea_controller.py
-│   │
-│   ├── services/
-│   │   ├── ai_response_parser.py
-│   │   ├── ai_service.py
-│   │   ├── idea_service.py
-│   │   ├── pdf_service.py
-│   │   ├── prompt_service.py
-│   │   ├── validation_service.py
-│   │   └── prompts/
-│   │
-│   ├── repositories/
-│   │   ├── ai_repository.py
-│   │   ├── idea_repository.py
-│   │   └── user_repository.py
-│   │
-│   ├── models/
-│   │   ├── analysis.py
-│   │   ├── idea.py
-│   │   └── user.py
-│   │
-│   ├── database/
-│   │   ├── connection.py
-│   │   ├── schema.sql
-│   │   └── test.sql
-│   │
-│   └── utils/
-│       ├── exceptions.py
-│       ├── helpers.py
-│       └── logger.py
-│
-├── frontend/
-│   └── pages/
-│       ├── chat.py
-│       ├── create.py
-│       ├── documentation.py
-│       ├── edit.py
-│       ├── help.py
-│       ├── hero.py
-│       └── list.py
-│
-├── app.py
-├── requirements.txt
-├── .env.example
-└── README.md
-```
-
-</details>
-
-> Algumas partes da estrutura já estão preparadas para funcionalidades que ainda serão implementadas nas próximas etapas.
-
----
+Leitura, edição, exclusão e autenticação não fazem parte do fluxo ativo; devem ser adicionadas como novos casos de uso.
