@@ -1,19 +1,35 @@
 # OlivIA Ideas
 
-OlivIA Ideas é um laboratório de Engenharia de Software para estruturar, persistir e analisar ideias de produto. A aplicação combina metodologia 5W2H, Streamlit, MySQL e Google Gemini em um fluxo de criação com contratos explícitos entre interface, regras de negócio e persistência.
+OlivIA Ideas é uma aplicação de portifólio voltada a estruturação, persistência e análise de ideias de produto. A aplicação combina metodologia 5W2H, Streamlit, MySQL e Google Gemini em um fluxo de criação com contratos explícitos entre interface, regras de negócio e persistência.
 
 O projeto evoluiu do experimento IdeaForge AI para uma aplicação em camadas, com foco em decisões técnicas rastreáveis e evolução sustentável.
 
 ## Funcionalidades atuais
 
 - Criação de ideias com título, descrição e 5W2H.
-- Geração ou refinamento de título e 5W2H com Gemini.
+- Preenchimento, geração e refinamento de conteúdo com Gemini.
 - Análise de negócio por IA: problema, viabilidade, público, riscos, concorrentes e próximos passos.
-- Persistência transacional em MySQL de ideias, 5W2H e análises.
-- Origem por campo: `USER` para conteúdo manual preservado e `AI` para conteúdo gerado ou refinado pela IA.
-- Validação de payload, exceções por camada e logging estruturado.
+- Persistência de ideias, 5W2H e análises no MySQL.
+- Preservação da origem dos conteúdos (`USER` ou `AI`)
 
-Create + IA é o fluxo ativo. CRUD completo, autenticação e testes automatizados são próximos incrementos.
+## Demonstração
+
+A versão pública do demo apresenta o conceito de análise de ideias com apoio do Gemini, sem dependência do banco de dados.
+
+**[Demo online](https://olivia-ideas-demo-f7phr9pugbhhdqlnwanuot.streamlit.app/)**
+
+O fluxo atual de desenvolvimento evoluiu para um processo de criação
+integrado à persistência em MySQL, com possibilidade de combinar dados fornecidos pelo usuário e conteúdo gerado ou refinado pela IA.
+
+[Documentação do fluxo Create + IA](docs/demo.md)
+
+## Detalhes técnicos
+- Arquitetura em camadas com MVC, Service Layer e Repository Pattern.
+- Validação de payload e respostas da IA.
+- Logging estruturado.
+- Configuração segura de credenciais por variáveis de ambiente.
+
+O fluxo atual concentra-se na criação e análise de ideias com apoio de IA. Leitura, edição, exclusão, autenticação e testes automatizados fazem parte da evolução planejada.
 
 ## Arquitetura
 
@@ -24,7 +40,11 @@ Streamlit (View) → Controller → Services → Repository → MySQL
                                   └──────→ Gemini API
 ```
 
-Consulte [arquitetura](docs/architecture.md), [banco de dados](docs/database.md), [decisões de desenvolvimento](docs/development.md) e [guia de demonstração](docs/demo.md).
+Consulte:
+- [Arquitetura](docs/architecture.md)
+- [Banco de dados](docs/database.md)
+- [Decisões de desenvolvimento](docs/development.md)
+- [Demonstração do fluxo Create + AI](docs/demo.md)
 
 ## Tecnologias
 
@@ -78,17 +98,18 @@ streamlit run app.py
 ```text
 olivia-ideas/
 ├── app.py
-├── frontend/pages/              # View Streamlit
+├── frontend/
+│   └── pages/                 # View Streamlit
 ├── backend/
-│   ├── controllers/             # Entrada do caso de uso
-│   ├── services/                # Validação, IA e regras de negócio
-│   ├── repositories/            # Persistência SQL
-│   ├── database/                # Conexão e schema
-│   └── utils/                   # Logging
+│   ├── controllers/           # Entrada dos casos de uso
+│   ├── services/              # Validação, IA e regras de negócio
+│   ├── repositories/          # Persistência SQL
+│   ├── database/              # Conexão e schema
+│   └── utils/                 # Logging
 ├── docs/
 └── requirements.txt
 ```
 
 ## Convenções
 
-Credenciais são lidas de variáveis de ambiente e nunca devem aparecer em logs. Commits seguem Conventional Commits, por exemplo: `feat: add idea source mapping` e `fix: validate Gemini response`.
+Credenciais são obtidas de variáveis de ambiente e nunca devem aparecer em logs. Commits seguem Conventional Commits, por exemplo: `feat: add idea source mapping` e `fix: validate Gemini response`.
