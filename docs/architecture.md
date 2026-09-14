@@ -5,9 +5,9 @@
 OlivIA Ideas usa arquitetura em camadas inspirada em MVC. Streamlit cumpre o papel de View; o controller recebe a intenção da tela; services coordenam regras de negócio e integrações; repositories isolam SQL e transações.
 
 ```text
-┌──────────────┐    ┌────────────┐    ┌─────────────────────┐
+┌──────────────┐     ┌────────────┐    ┌─────────────────────┐
 │ Streamlit UI │───▶│ Controller │───▶│    IdeaService      │
-└──────────────┘    └────────────┘    └───────┬─────────────┘
+└──────────────┘     └────────────┘    └───────┬─────────────┘
                                                │
                          ┌─────────────────────┼────────────────────┐
                          ▼                     ▼                    ▼
@@ -31,7 +31,7 @@ Essa separação impede que a interface conheça SQL, que a persistência conhe�
 7. O service marca `AI` para campos gerados/refinados e `USER` para valores manuais preservados.
 8. `IdeaRepository` persiste ideia e 5W2H na mesma transação; análises são persistidas e podem ser renderizadas em Markdown.
 
-O caminho “Salvar apenas” passa por validação e banco, sem criar um cliente Gemini.
+O caminho “Salvar apenas” passa por validação e persistência normalmente, mas não inicializa o cliente Gemini quando nenhuma opção de IA é selecionada.
 
 ## Responsabilidades por camada
 
@@ -65,12 +65,27 @@ Exceções específicas preservam o contexto da falha por camada, e logs estrutu
 
 ```text
 backend/
-├── controllers/create_idea_controller.py
-├── database/{connection.py,schema.sql}
-├── repositories/idea_repository.py
-├── services/{ai_response_parser.py,ai_service.py,idea_service.py,prompt_service.py,validation_service.py,prompts/}
-└── utils/logger.py
-frontend/pages/{hero.py,create.py}
+├── controllers/
+│   └── create_idea_controller.py
+├── database/
+│   ├── connection.py
+│   └── schema.sql
+├── repositories/
+│   └── idea_repository.py
+├── services/
+│   ├── ai_response_parser.py
+│   ├── ai_service.py
+│   ├── idea_service.py
+│   ├── prompt_service.py
+│   ├── validation_service.py'
+│   └── prompts/
+└── utils/
+    └── logger.py
+
+frontend/
+└── pages/
+    ├── hero.py
+    └── create.py
 ```
 
-Leitura, edição, exclusão e autenticação não fazem parte do fluxo ativo; devem ser adicionadas como novos casos de uso.
+Leitura, edição, exclusão e autenticação ainda não fazem parte dos casos de uso ativos e serão incorporadas posteriormente como novos fluxos e respectivas camadas de aplicação.
