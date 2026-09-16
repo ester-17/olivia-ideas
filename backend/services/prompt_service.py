@@ -56,7 +56,7 @@ class PromptService:
 
         logger.debug(
             "AI prompt build successfully | blocks=%s | length=%s",
-            len(blocks),len(prompt)
+            len(blocks), len(prompt)
         )
 
         return prompt
@@ -64,8 +64,8 @@ class PromptService:
     def _build_idea_context(self, payload: dict) -> str:
         """Build the idea context included in the AI prompt."""
 
-        idea =payload["idea"]
-        methodology = idea.get("methodology",{}).get("data", {})
+        idea = payload["idea"]
+        methodology = idea.get("methodology", {}).get("data", {})
 
         return f"""
 ## DADOS DA IDEIA

@@ -54,8 +54,6 @@ class ValidationService:
             logger.error("The 'options' field is missing in the payload.")
             raise ValidationError("The 'options' field is missing.")
 
-        # Validate options first because _validate_idea
-        # depends on the AI configuration.
         self._validate_options(payload["options"])
 
         self._validate_idea(
@@ -96,7 +94,8 @@ class ValidationService:
         )
 
         self._validate_5w2h(
-            idea["methodology"]
+            idea["methodology"],
+            ai_options
         )
 
     def _validate_options(self, options: dict) -> None:
@@ -181,7 +180,7 @@ class ValidationService:
             logger.error("Description can't be empty.")
             raise ValidationError("Description can't be empty.")
 
-    def _validate_5w2h(self, methodology: dict) -> None:
+    def _validate_5w2h(self, methodology: dict, options: dict | None = None) -> None:
         """Validate the 5W2H methodology."""
 
         if not isinstance(methodology, dict):
@@ -198,26 +197,36 @@ class ValidationService:
             logger.error("Invalid 5W2H data type.")
             raise ValidationError("Invalid 5W2H data.")
 
-        for field in self.REQUIRED_5W2H_FIELDS:
+        ai_methodology = {}
+        is_manual = True
+        if options:
+            is_manual = options.get("manual_5w2h", False)
+            ai_methodology = options.get("ai_options", {}).get("methodology", {})
 
+        for field in self.REQUIRED_5W2H_FIELDS:
             if field not in data:
                 logger.error(
                     "The '%s' field is missing in 5W2H.",
                     field
                 )
-
                 raise ValidationError(
                     f"The '{field}' field is missing in 5W2H."
                 )
 
             value = data[field]
-
             if not isinstance(value, str):
                 logger.error(
                     "The '%s' must be text.",
                     field
                 )
-
                 raise ValidationError(
                     f"The '{field}' must be text."
                 )
+
+            field_requested_ai = ai_methodology.get(field, False)
+            if not is_manual or field_requested_ai:
+                continue
+
+            if not value.strip():
+                logger.error("The '%s' field cannot be empty when manual.", field)
+                raise ValidationError(f"The {field} field cannot be empty when manual.")
