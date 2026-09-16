@@ -43,19 +43,19 @@ def render_form() -> dict[str, Any]:
         height=60,
     )
 
-    checkbox_label = (
-        "Refinar com IA"
-        if idea_title.strip()
-        else "Gerar título com IA."
+    is_title_empty = not idea_title.strip()
+    title_checkbox_label = (
+        "Gerar título com IA" if is_title_empty else "Refinar título com IA"
     )
-
     ai_title = st.checkbox(
-        checkbox_label,
+        title_checkbox_label,
         help=(
             "Se o título estiver vazio, a IA irá gerar um novo. "
             "Caso contrário, ela irá sugerir uma versão aprimorada."
         ),
-        value=not idea_title.strip(),
+        # value=is_title_empty,
+        value = not idea_title.strip(),
+        # key="title_ai_checkbox"        
     )
 
     idea_description = st.text_area(
@@ -105,9 +105,9 @@ def render_form() -> dict[str, Any]:
         st.subheader("5W2H")
 
         st.info(
-            "Campos vazios serão preenchidos automaticamente pela IA.\n\n"
-            "Caso deseje melhorar um campo já preenchido, marque "
-            "'Refinar com IA'."
+            "Campos vazios e opções de IA marcadas são gerados "
+            "automaticamente.\nCaso deseje aprimorar um campo preenchido,"
+            "mantenha a opção 'Refinar com IA' ativa."
         )
 
         for field, label, placeholder in FIELDS:
@@ -119,12 +119,30 @@ def render_form() -> dict[str, Any]:
                 key=f"{field}_text",
             ).strip()
 
+            is_field_empty = not text
+            field_checkbox_label = (
+                f"Gerar {label.split()[0]} com IA" 
+                if is_field_empty else "Refinar com IA"
+            )
+
+            cb_key = f"{field}_ai"
+            was_empty_key = f"{field}_was_empty"
+
+            if cb_key not in st.session_state:
+                st.session_state[cb_key] = is_field_empty
+            elif not is_field_empty and st.session_state.get(was_empty_key, True):
+                st.session_state[cb_key]  = False
+
+            st.session_state[was_empty_key] = is_field_empty
+
+            use_ai = st.checkbox(
+                field_checkbox_label,
+                key=f"{field}_ai"
+            )
+
             methodology_data[field] = text
-            if text:
-                ai_suggestions[field] = st.checkbox(
-                    "Refinar com IA",
-                    key=f"{field}_ai",
-                )
+            ai_suggestions[field] = use_ai
+            
 
     return {
 
@@ -148,7 +166,6 @@ def build_payload(form_data: Mapping[str, Any]) -> dict[str, Any]:
     payload = {
 
         "idea": {
-
             "title": form_data["title"].strip(),
             "description": form_data["description"].strip(),
             "methodology": {
@@ -187,8 +204,8 @@ def submit(payload: Mapping[str, Any]) -> None:
 
         logger.info(
             "Submitting payload | generate_analysis=%s | show_report=%s | ai_title=%s",
-            payload["options"]["generate_analysis"],
-            payload["options"]["show_report"],
+            options["generate_analysis"],
+            options["show_report"],
             options["ai_options"]["title"],
         )
 

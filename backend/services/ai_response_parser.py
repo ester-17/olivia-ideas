@@ -110,6 +110,11 @@ class AIResponseParser:
             sections.append(self._markdown_viability(analysis))
         if "target_audience" in analysis:
             sections.append(self._markdown_target_audience(analysis))
+
+        fivew2h = analysis.get("fivew2h", {})
+        if fivew2h:
+            sections.append(self._markdown_5w2h(fivew2h))
+
         if "risks" in analysis:
             sections.append(self._markdown_risks(analysis))
         if "competitors" in analysis:
@@ -229,17 +234,48 @@ class AIResponseParser:
                 logger.error(f"Field '{field}' is missing in 5W2H.")
                 raise AIResponseParserError(f"Field '{field}' is missing in 5W2H.")
 
-            value = fivew2h[field]
+        for field, value in fivew2h.items():
             if not isinstance(value, str):
-                logger.error(f"Field '{field}' in 5W2H must be a string.")
-                raise AIResponseParserError(f"Field '{field}' in 5W2H must be a string.")
+                logger.error(
+                    "Field '%s' in 5W2H cannot be empty.",
+                    field,
+                )
+                raise AIResponseParserError(
+                    f"Field '{field}' in 5W2H cannot be empty."
+                    )
             if not value.strip():
-                logger.error(f"Field '{field}' in 5W2H cannot be empty.")
-                raise AIResponseParserError(f"Field '{field}' in 5W2H cannot be empty.")
+                logger.error("Field '%s' in 5W2H cannot be empty")
+                raise AIResponseParserError(
+                    f"Field '{field}' in 5W2H cannot be empty."
+                    )
 
     # ==================================================
     # Markdown Formatting Helpers
     # ==================================================
+
+    def _markdown_5w2h(self, fivew2h: Mapping[str, Any]) -> str:
+        """Format 5W2H dictionary into a Markdown table section.
+        
+        Args:
+            fivew2h: Dictionary containing the 5W2H keys directly.
+            
+        Returns:
+            str: Formatted Markdown table.
+        """
+        return cleandoc(f"""
+            ## 📋 Planejamento 5W2H
+
+            | Pergunta | Detalhamento |
+            | :--- | :--- |
+            | **What (O quê?)** | {fivew2h.get("what", "N/A")} |
+            | **Why (Por quê?)** | {fivew2h.get("why", "N/A")} |
+            | **Where (Onde?)** | {fivew2h.get("where", "N/A")} |
+            | **When (Quando?)** | {fivew2h.get("when", "N/A")} |
+            | **Who (Quem?)** | {fivew2h.get("who", "N/A")} |
+            | **How (Como?)** | {fivew2h.get("how", "N/A")} |
+            | **How Much (Quanto?)** | {fivew2h.get("how_much", "N/A")} |
+        """)
+
 
     def _markdown_problem(self, analysis: Mapping[str, Any]) -> str:
         """Format the problem section.
