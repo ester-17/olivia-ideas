@@ -1,8 +1,7 @@
-olivia-ideas
+olivia-ideas/
 .env
 *.pyc
 __pycache__/
 .streamlit/secrets.toml
 demo/.streamlit/secrets.toml
 logs/
-*.log
