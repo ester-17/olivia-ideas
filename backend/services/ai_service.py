@@ -83,21 +83,23 @@ class AIService:
             generated_data = parsed_response["fivew2h"]
             if methodology_task == "generate":
                 payload["idea"]["methodology"]["data"].update(generated_data)
-            else:
+            elif isinstance(methodology_task, Mapping):
                 requested_fields = methodology_task.keys()
-                payload["idea"]["methodology"]["data"].update(
-                    {
-                        field: generated_data[field]
-                        for field in requested_fields
-                    }
-                )
+                for field in requested_fields:
+                    if field in generated_data:
+                        payload["idea"]["methodology"]["data"].update(
+                            {
+                                field: generated_data[field]
+                            }
+                    )
             logger.debug("Updated payload 5W2H methodology from AI response")
 
-        # 5. Extract internal analysis payload if requested
-        analysis = parsed_response.get(
-            "analysis"
-        ) if ai_tasks.get("analysis") else None
-
+        # 6. Extract internal analysis payload if requested
+        analysis: dict[str, Any] | None = None
+        if ai_tasks.get("analysis"):
+            analysis = parsed_response.get("analysis", {})
+            analysis["fivew2h"] = payload["idea"]["methodology"]["data"]
+            
         if analysis:
             logger.debug("AI analysis extracted successfully")
 
