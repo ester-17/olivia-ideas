@@ -1,6 +1,6 @@
 # OlivIA Ideas
 
-OlivIA Ideas é uma aplicação de portifólio voltada a estruturação, persistência e análise de ideias de produto. A aplicação combina metodologia 5W2H, Streamlit, MySQL e Google Gemini em um fluxo de criação com contratos explícitos entre interface, regras de negócio e persistência.
+OlivIA Ideas é uma aplicação de portfólio voltada a estruturação, persistência e análise de ideias de produto. A aplicação combina metodologia 5W2H, Streamlit, MySQL e Google Gemini em um fluxo de criação com contratos explícitos entre interface, regras de negócio e persistência.
 
 O projeto evoluiu do experimento IdeaForge AI para uma aplicação em camadas, com foco em decisões técnicas rastreáveis e evolução sustentável.
 
@@ -8,6 +8,7 @@ O projeto evoluiu do experimento IdeaForge AI para uma aplicação em camadas, c
 
 - Criação de ideias com título, descrição e 5W2H.
 - Preenchimento, geração e refinamento de conteúdo com Gemini.
+- Exibição dos dados da ideia e do 5W2H no relatório.
 - Análise de negócio por IA: problema, viabilidade, público, riscos, concorrentes e próximos passos.
 - Persistência de ideias, 5W2H e análises no MySQL.
 - Preservação da origem dos conteúdos (`USER` ou `AI`)
@@ -18,9 +19,6 @@ A versão pública do demo apresenta o conceito de análise de ideias com apoio 
 
 **[Demo online](https://olivia-ideas-demo-f7phr9pugbhhdqlnwanuot.streamlit.app/)**
 
-O fluxo atual de desenvolvimento evoluiu para um processo de criação
-integrado à persistência em MySQL, com possibilidade de combinar dados fornecidos pelo usuário e conteúdo gerado ou refinado pela IA.
-
 [Documentação do fluxo Create + IA](docs/demo.md)
 
 ## Detalhes técnicos
@@ -29,7 +27,7 @@ integrado à persistência em MySQL, com possibilidade de combinar dados forneci
 - Logging estruturado.
 - Configuração segura de credenciais por variáveis de ambiente.
 
-O fluxo atual concentra-se na criação e análise de ideias com apoio de IA. Leitura, edição, exclusão, autenticação e testes automatizados fazem parte da evolução planejada.
+O fluxo atual de desenvolvimento concentra-se na criação e análise de ideias, integrando persistência em MySQL e permitindo combinar dados fornecidos pelo usuário com conteúdo gerado ou refinado pela IA. Leitura, edição, exclusão, autenticação e testes automatizados fazem parte da evolução planejada.
 
 ## Arquitetura
 

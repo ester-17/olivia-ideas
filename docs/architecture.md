@@ -22,14 +22,14 @@ Essa separação impede que a interface conheça SQL, que a persistência conhe�
 
 ## Fluxo Create + IA
 
-1. `frontend/pages/create.py` coleta título, descrição, opções de IA e dados 5W2H.
+1. `frontend/pages/create.py` coleta título, descrição, opções de IA e dados 5W2H, incluindo a opção de gerar ou refinar individualmente cada campo.
 2. `build_payload()` converte o estado da tela no contrato de entrada do backend.
 3. `CreateIdeaController.create_idea()` delega o caso de uso a `IdeaService`.
 4. `ValidationService` valida estrutura, tipos e campos obrigatórios.
-5. `IdeaService` resolve tarefas: gerar/refinar título, gerar/refinar 5W2H e analisar.
-6. Se necessário, `AIService` monta o prompt, chama Gemini e `AIResponseParser` valida o JSON.
+5. `IdeaService` resolve as tarefas de IA solicitadas, determinando se título e cada campo do 5W2H devem ser gerados ou refinados, além de controlar a análise da ideia.
+6. Se necessário, `AIService` monta o prompt, chama Gemini e `AIResponseParser` valida o JSON e normaliza o JSON retornado.
 7. O service marca `AI` para campos gerados/refinados e `USER` para valores manuais preservados.
-8. `IdeaRepository` persiste ideia e 5W2H na mesma transação; análises são persistidas e podem ser renderizadas em Markdown.
+8. `IdeaRepository` persiste ideia e 5W2H na mesma transação; análises são persistidas e podem ser renderizadas em Markdown, incluindo o 5W2H em uma seção expansível.
 
 O caminho “Salvar apenas” passa por validação e persistência normalmente, mas não inicializa o cliente Gemini quando nenhuma opção de IA é selecionada.
 
@@ -77,7 +77,7 @@ backend/
 │   ├── ai_service.py
 │   ├── idea_service.py
 │   ├── prompt_service.py
-│   ├── validation_service.py'
+│   ├── validation_service.py
 │   └── prompts/
 └── utils/
     └── logger.py

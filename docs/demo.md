@@ -19,7 +19,11 @@ Este guia descreve o fluxo ativo de criação: coleta de informações, opções
 4. Escolha preenchimento manual do 5W2H e informe os campos desejados.
 5. Clique em **Criar ideia**.
 
-O backend valida o payload e grava `ideas` e `idea_5w2h` na mesma transação. Todo campo manual preservado recebe origem `USER`. Esse cenário não chama Gemini nem requer chave de IA.
+> Para fins de demonstração, os exemplos utilizam o próprio OlivIA Ideas como ideia analisada pelo sistema.
+
+![Formulário de criação](assets/formulario.png)
+
+O backend valida o payload e grava `ideas` e `idea_5w2h` na mesma transação. Os campos 5W2H informados manualmente e  preservados recebem origem `USER`. Esse cenário não chama Gemini nem requer chave de IA.
 
 ## Cenário 2 — Gerar 5W2H e análise com IA
 
@@ -38,7 +42,9 @@ O backend valida o payload e grava `ideas` e `idea_5w2h` na mesma transação. T
 3. Marque **Refinar com IA** somente nos campos desejados.
 4. Escolha uma modalidade de análise e envie.
 
-Somente campos selecionados são atualizados pela resposta da IA. No banco, campos refinados recebem `AI`; campos preservados recebem `USER`.
+![Formulário 5W2H](assets/5w2h.png)
+
+Somente campos selecionados são atualizados pela resposta da IA. No banco, campos gerados e refinados recebem `AI`; campos preservados recebem `USER`.
 
 ## Resultado esperado no banco
 
@@ -46,16 +52,30 @@ Após sucesso, existe uma linha em `ideas` e outra em `idea_5w2h`. Quando análi
 
 ```sql
 SELECT
-    i.id,
+    i.id AS idea_id,
     i.title,
-    m.what,
-    m.what_source,
-    m.why,
-    m.why_source
-FROM ideas AS i
-JOIN idea_5w2h AS m ON m.idea_id = i.id
-ORDER BY i.id DESC;
+    i.description,
+    i.status,
+    w.what,
+    w.what_source,
+    w.why,
+    w.why_source,
+    w.where_location,
+    w.where_location_source,
+    w.when_info,
+    w.when_source
+FROM ideas i
+LEFT JOIN idea_5w2h w
+    ON w.idea_id = i.id
+WHERE i.id = 74
 ```
+
+![Dados persistidos no banco de dados](assets/database.png)
+
+## Resultado no relatório
+Quando a opção de análise e exibição do relatório é selecionada, o resultado é apresentado em Markdown, incluindo os dados da ideia, a análise gerada e o 5W2H.
+
+![Relatório da ideia com 5W2H](assets/report.png)
 
 ## Observabilidade e falhas
 

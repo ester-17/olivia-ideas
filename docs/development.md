@@ -2,7 +2,7 @@
 
 ## 1. Responsabilidade e Fluxo da Página de Criação
 
-O módulo `frontend/pages/create.py` é a fronteira de interação do caso de uso de criação. Ele coleta título, descrição, preferências de geração/refinamento por IA, dados manuais 5W2H e a opção de análise. A tela não contém SQL nem regras de orquestração do Gemini.
+O módulo `frontend/pages/create.py` é a fronteira de interação do caso de uso de criação. Ele coleta título, descrição, dados manuais 5W2H, preferências de geração/refinamento por IA e a opção de análise. A tela não contém SQL nem regras de orquestração do Gemini.
 
 `render_form()` produz o estado da interface. `build_payload()` o transforma no contrato de backend. `submit()` delega o contrato a `CreateIdeaController.create_idea()`, que chama `IdeaService`. Ao final, a página mostra sucesso ou erro e renderiza o relatório Markdown quando solicitado.
 
@@ -14,7 +14,7 @@ Estimativas no desenvolvimento de software representam previsões baseadas no co
 
 ## 3. Gestão de Credenciais e Segurança (Vazamento de API Keys)
 
-No histórico inicial ocorreu a exposição acidental de uma chave da API Gemini. A contenção apropriada inclui revogação ou rotação imediata no provedor, remoção da credencial do código, uso de variáveis de ambiente (`.env`) ou `st.secrets`, atualização do `.gitignore` e verificação de que logs não recebam a chave.
+No histórico inicial ocorreu a exposição acidental de uma chave da API Gemini. A contenção apropriada incluiu revogação e rotação imediata no provedor, remoção da credencial do código, uso de variáveis de ambiente (`.env`) ou `st.secrets`, atualização do `.gitignore` e verificação de que logs não recebam a chave.
 
 Informações sensíveis e credenciais jamais devem fazer parte do código-fonte ou ser versionadas no repositório.
 
@@ -53,3 +53,5 @@ A interface segue `configure_page()` → `render_form()` → `build_payload()` �
 | Tipagem e imutabilidade de dados            | Uso de `type hints` avançados e `Mapping` para parâmetros somente leitura             | Contratos de interface e prevenção de efeitos colaterais em coleções       |
 | Documentação e histórico inconsistentes     | Adoção de docstrings no padrão Google e histórico em Conventional Commits             | Manutenibilidade do código e rastreabilidade profissional no versionamento |
 | Variação no tempo de desenvolvimento        | Acomodação de refatorações de arquitetura e ajustes de qualidade                      | Estimativa como previsão e necessidade de considerar débitos técnicos      |
+| Necessidade de combinar dados fornecidos pelo usuário com conteúdo gerado pela IA  | Introdução do rastreamento de origem dos campos (`USER` / `AI`) e processamento individual das opções de geração/refinamento | Modelagem explícita de origem dos dados e separação entre conteúdo informado e conteúdo gerado |
+| Respostas da IA precisam representar diferentes operações solicitadas pelo usuário | Estruturação das opções de IA no payload e validação/processamento da resposta conforme as tarefas solicitadas               | Importância de contratos explícitos entre a aplicação e serviços externos                      |
