@@ -102,7 +102,6 @@ def analyze_idea(idea: str) -> str:
     Você é um especialista em startups e produto.
 
     Analise a ideia abaixo:
-
     {idea}
 
     Responda em português, usando markdown estruturado:
