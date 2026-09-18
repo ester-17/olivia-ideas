@@ -1,11 +1,14 @@
+"""Streamlit page used to create and optionally analyze an idea."""
+
+import logging
+from typing import Any, Mapping
 import streamlit as st
 
 from backend.controllers.create_idea_controller import create_idea_controller
 
+logger = logging.getLogger("olivia.frontend.create")
 
-# ==================================================
 # Constants
-# ==================================================
 
 FIELDS = [
     ("what", "What (O que?)", "Ex.: Plataforma para conectar estudantes a empresas para estágios"),
@@ -17,68 +20,49 @@ FIELDS = [
     ("how_much", "How Much (Quanto?)", "Ex.: R$ 5.000, sem custos iniciais ou aproximadamente 100 horas de desenvolvimento."),
 ]
 
-
-# ==================================================
 # Page
-# ==================================================
 
-def configure_page():
-
-    st.set_page_config(
-        page_title="OlivIA Ideas",
-        page_icon="🧠",
-        layout="centered"
-    )
+def configure_page() -> None:
+    """Render the create-idea page title."""
 
     st.markdown(
         "<h1 style='text-align:center;'>Criar Ideia</h1>",
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
-
-# ==================================================
 # Form
-# ==================================================
 
-def render_form():
+def render_form() -> dict[str, Any]:
+    """Render the idea creation form and return its data as a dictionary."""
 
     st.subheader("Ideia")
 
     idea_title = st.text_area(
         "Dê um título à sua ideia",
         placeholder="Ex: OlivIA Ideas",
-        height=60
+        height=60,
     )
 
-    checkbox_label = (
-        "Refinar com IA"
-        if idea_title.strip()
-        else "Gerar título com IA."
+    is_title_empty = not idea_title.strip()
+    title_checkbox_label = (
+        "Gerar título com IA" if is_title_empty else "Refinar título com IA"
     )
-
-    if idea_title:
-        ai_title = st.checkbox(
-            "Refinar com IA",
-            help=(
-                "Se o título estiver vazio, a IA irá gerar um novo. "
-                "Caso contrário, ela irá sugerir uma versão aprimorada."
-                ))
-    
-    else:
-        ai_title = st.checkbox(
-            "Gerar título com IA",
-            help=(
-                "Se o título estiver vazio, a IA irá gerar um novo. "
-                "Caso contrário, ela irá sugerir uma versão aprimorada."
-            ))
-
+    ai_title = st.checkbox(
+        title_checkbox_label,
+        help=(
+            "Se o título estiver vazio, a IA irá gerar um novo. "
+            "Caso contrário, ela irá sugerir uma versão aprimorada."
+        ),
+        # value=is_title_empty,
+        value = not idea_title.strip(),
+        # key="title_ai_checkbox"        
+    )
 
     idea_description = st.text_area(
         "Descreva sua ideia",
         placeholder="Ex: Um sistema que transforma ideias em oportunidades...",
-        height=150
+        height=150,
     )
-
 
     st.divider()
 
@@ -93,8 +77,7 @@ def render_form():
         )
     )
 
-    use_ai = analysis_mode != "Salvar apenas"
-
+    generate_analysis = analysis_mode != "Salvar apenas"
     show_report = analysis_mode == "Salvar, analisar e exibir relatório"
 
     manual_5w2h = st.radio(
@@ -122,9 +105,9 @@ def render_form():
         st.subheader("5W2H")
 
         st.info(
-            "Campos vazios serão preenchidos automaticamente pela IA.\n\n"
-            "Caso deseje melhorar um campo já preenchido, marque "
-            "'Refinar com IA'."
+            "Campos vazios e opções de IA marcadas são gerados "
+            "automaticamente.\nCaso deseje aprimorar um campo preenchido,"
+            "mantenha a opção 'Refinar com IA' ativa."
         )
 
         for field, label, placeholder in FIELDS:
@@ -133,138 +116,147 @@ def render_form():
                 label,
                 placeholder=placeholder,
                 height=70,
-                key=f"{field}_text"
+                key=f"{field}_text",
             ).strip()
 
+            is_field_empty = not text
+            field_checkbox_label = (
+                f"Gerar {label.split()[0]} com IA" 
+                if is_field_empty else "Refinar com IA"
+            )
+
+            cb_key = f"{field}_ai"
+            was_empty_key = f"{field}_was_empty"
+
+            if cb_key not in st.session_state:
+                st.session_state[cb_key] = is_field_empty
+            elif not is_field_empty and st.session_state.get(was_empty_key, True):
+                st.session_state[cb_key]  = False
+
+            st.session_state[was_empty_key] = is_field_empty
+
+            use_ai = st.checkbox(
+                field_checkbox_label,
+                key=f"{field}_ai"
+            )
+
             methodology_data[field] = text
-            if text:
-                if use_ai:
-                    ai_suggestions[field] = (st.checkbox(
-                            "Refinar com IA",
-                            key=f"{field}_ai"
-                        )
-                    )
-                        
-                else:
-                    ai_suggestions[field] = False            
+            ai_suggestions[field] = use_ai
+            
 
     return {
 
         "title": idea_title,
         "description": idea_description,
-
         "manual_5w2h": manual_5w2h == "Manual",
-
-        "use_ai": use_ai,
-
+        "generate_analysis": generate_analysis,
         "show_report": show_report,
-
         "methodology_data": methodology_data,
-
-        "use_ai": {
+        "ai_options": {
             "title": ai_title,
-            "methodology": ai_suggestions
+            "methodology": ai_suggestions,
         },
     }
 
-
-# ==================================================
 # Payload
-# ==================================================
 
-def build_payload(form_data):
+def build_payload(form_data: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the payload expected by the create-idea controller."""
 
-    return {
+    payload = {
 
         "idea": {
-
             "title": form_data["title"].strip(),
-
             "description": form_data["description"].strip(),
-
             "methodology": {
-
                 "type": "5w2h",
-
-                "data": form_data["methodology_data"]
-
-            }
-
+                "data": form_data["methodology_data"],
+            },
         },
-
         "options": {
-
             "manual_5w2h": form_data["manual_5w2h"],
-
+            "generate_analysis": form_data["generate_analysis"],
             "show_report": form_data["show_report"],
-
-            "use_ai": form_data["use_ai"]
-
-        }
-
+            "ai_options": form_data["ai_options"],
+        },
     }
+
+    logger.debug(
+        "Idea payload built | manual_5w2h=%s | generate_analysis=%s | "
+        "show_report=%s | ai_title=%s",
+        payload["options"]["manual_5w2h"],
+        payload["options"]["generate_analysis"],
+        payload["options"]["show_report"],
+        payload["options"]["ai_options"]["title"],
+    )
+
+    return payload
 
 # ==================================================
 # Submit
 # ==================================================
 
-def submit(payload):
+def submit(payload: Mapping[str, Any]) -> None:
+    """Submit an idea payload to the create-idea controller."""
 
     try:
+        options = payload["options"]
 
-        response = (
-            create_idea_controller.create_idea(payload)
+        logger.info(
+            "Submitting payload | generate_analysis=%s | show_report=%s | ai_title=%s",
+            options["generate_analysis"],
+            options["show_report"],
+            options["ai_options"]["title"],
         )
 
+        response = create_idea_controller.create_idea(payload)
+
+        logger.info(
+            "Idea submitted successfully | idea_id=%s", response.get("idea_id"))
         st.success("Ideia criada com sucesso!")
 
         if response.get("report"):
-
+            logger.debug("Displaying AI report")
             st.markdown(response["report"])
 
-    except Exception as exc:
+    except Exception:
 
-        st.error(f"Erro: {exc}")
+        logger.exception("Failed to submit idea")
+        st.error("Não foi possível criar a ideia.")
 
 
 # ==================================================
 # Main
 # ==================================================
 
-def main():
+def main() -> None:
+    """Render and handle idea creation."""
 
     configure_page()
-
     form_data = render_form()
 
     st.divider()
 
     if st.button(
         "Criar ideia",
-        use_container_width=True
+        use_container_width=True,
     ):
+        logger.info("Create idea button clicked.")
 
-        if not form_data["title"].strip():
-
-            st.error(
-                "Informe um título para a ideia."
-            )
-
-            return
 
         if not form_data["description"].strip():
 
             st.error(
                 "Informe uma descrição para a ideia."
             )
+            logger.warning("Form submission rejected: description field is empty")
 
             return
 
-        payload = build_payload(form_data)
-
-        submit(payload)
+        with st.spinner("Criando ideia..."):
+            payload = build_payload(form_data)
+            submit(payload)
 
 
 if __name__ == "__main__":
-
     main()

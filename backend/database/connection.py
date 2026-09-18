@@ -1,32 +1,38 @@
+"""MySQL connection and transaction management."""
+
 import os
+from typing import Any
+
 import mysql.connector
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
+
 class DatabaseConnectionError(Exception):
-    """
-    Raised when a database connection fails.
-    """
-    pass
+    """Raised when a MySQL connection cannot be created."""
+
 
 class DatabaseConnection:
+    """Manage a MySQL connection, cursors, and transactions.
+
+    Attributes:
+        _connection: Lazily created MySQL connection, when available.
     """
-    Manages the lifecycle of a database connection and its transactions.
 
-    This class provides methods to open and close connections, manage
-    database cursors, and commit or rollback active transactions.
-    """
+    def __init__(self) -> None:
+        """Initialize the connection manager without opening a connection."""
+        self._connection: Any | None = None
 
-    def __init__(self):
-        self._connection = None
-
-    def create_connection(self) -> "mysql.connector.MySQLConnection":
-        """
-        Creates a connection to MySQL if it does not already exist.
+    def create_connection(self) -> Any:
+        """Create and return the active MySQL connection.
 
         Returns:
-            The active MySQL connection object.
+            A connection created by ``mysql.connector``.
+
+        Raises:
+            DatabaseConnectionError: If MySQL rejects or cannot establish the connection.
         """
         if self._connection is None:
             try:
@@ -37,48 +43,39 @@ class DatabaseConnection:
                     password=os.getenv("DB_PASSWORD"),
                     database=os.getenv("DB_NAME"),
                 )
-            except mysql.connector.Error as exc:
-                raise DatabaseConnectionError(
-                    "Could not connect to the database."
-                ) from exc
-
+            except (ValueError, mysql.connector.Error) as exc:
+                raise DatabaseConnectionError("Could not connect to the database.") from exc
         return self._connection
-    
-    def get_cursor(self):
-        """
-        Returns a cursor for executing SQL commands.
-        """
-        connection = self.create_connection()
-        return connection.cursor(dictionary=True)
 
-    def close_cursor(self, cursor) -> None:
+    def get_cursor(self) -> Any:
+        """Return a dictionary cursor for the active connection.
+
+        Returns:
+            A MySQL cursor configured to return dictionaries.
         """
-        Closes an active database cursor.
-        
+        return self.create_connection().cursor(dictionary=True)
+
+    def close_cursor(self, cursor: Any | None) -> None:
+        """Close a cursor when one was created.
+
         Args:
-            cursor: The MySQL cursor object to be closed.
+            cursor: The cursor to close, or ``None``.
         """
         if cursor is not None:
             cursor.close()
 
     def commit(self) -> None:
-        """
-        Commits the current transaction to the database.
-        """
+        """Commit the active transaction, if a connection exists."""
         if self._connection is not None:
             self._connection.commit()
 
     def rollback(self) -> None:
-        """
-        Rollbacks the current transaction to the database.
-        """
+        """Roll back the active transaction, if a connection exists."""
         if self._connection is not None:
             self._connection.rollback()
 
     def close_connection(self) -> None:
-        """
-        Closes the active database connection safely.
-        """
-        if self._connection:
+        """Close and discard the active database connection."""
+        if self._connection is not None:
             self._connection.close()
             self._connection = None

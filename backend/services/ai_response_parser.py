@@ -1,31 +1,21 @@
+"""Validation and Markdown formatting for structured AI responses."""
+
 import json
+import logging
+from inspect import cleandoc
+from typing import Any, Mapping
+
+logger = logging.getLogger("olivia.services.parser")
 
 class AIResponseParserError(Exception):
-    """Raised when the AI response has an invalid structure."""
+    """Raised when the AI response has an invalid structure or data type."""
 
 class AIResponseParser:
-    """Parses, validates, and formats AI-generated analysis responses.
+    """Parses, validates, and formats AI-generated responses dynamically.
 
-    The parser converts JSON responses into Python dictionaries, validates their
-    structure and data types, and formats validated data as Markdown.
-
-    Attributes:
-        REQUIRED_FIELDS: A tuple containing all mandatory top-level fields.
-        REQUIRED_5W2H_FIELDS: A tuple containing the mandatory fields
-        inside the 5W2H section.
-        TEXT_FIELDS: A tuple of required text fields excluding 5W2H.
+    Handles full analysis payloads as well as partial field processing
+    (e.g., title generation or 5W2H refinement).
     """
-
-    
-    REQUIRED_FIELDS =(
-        "problem",
-        "viability",
-        "target_audience",
-        "fivew2h",
-        "risks",
-        "competitors",
-        "next_steps",
-    )
 
     REQUIRED_5W2H_FIELDS = (
         "what",
@@ -37,195 +27,339 @@ class AIResponseParser:
         "how_much",
     )
 
-    TEXT_FIELDS = (
-        "problem",
-        "viability",
-        "target_audience",
-        "risks",
-        "competitors",
-        "next_steps",
-    )
+    ANALYSIS_SCHEMA = {
+        "problem": str,
+        "viability": int,
+        "target_audience": str,
+        "risks": list,
+        "competitors": list,
+        "next_steps": list,
+    }
 
-    def parse(self, text: str) -> dict:
-        """Converts the received JSON AI response into a Python object.
-        
+    def parse(self, text: str) -> dict[str, Any]:
+        """Converts the received JSON AI response into a validated dictionary.
+
         Args:
             text: Raw JSON string received from the AI model.
 
-        Return:
+        Returns:
             The parsed and validated dictionary.
         """
         data = self._load_json(text)
         self.validate(data)
-
         return data
 
-    def validate(self, data: dict):
-        """Orchestrates the validation process of different received fields.
-        
+    def validate(self, data: Mapping[str, Any]) -> None:
+        """Orchestrates validation of top-level object, title, 5W2H, and analysis fields.
+
         Args:
-            data: The parsed dictionary to be validated.
-            
+            data: Parsed dictionary to validate.
+
         Raises:
-            AIResponseParserError: If any structural or type validation fails."""
-        self._validate_structure(data)
-        self._validate_types(data)
-        self._validate_5w2h(data["fivew2h"])
+            AIResponseParserError: If structural or type validation fails.
+        """
+        logger.debug("Validating AI response structure")
 
-    def to_markdown(self, analysis: dict) -> str:
-        """Converts the received Python object into Markdown.
-        
-        Args:
-            analysis: The validated dictionary containing the AI analysis.
+        if not isinstance(data, dict):
+            logger.error("The AI response must be a JSON object.")
+            raise AIResponseParserError("The AI response must be a JSON object.")
+
+        # 1. Validate Title (if present in the response)
+        if "title" in data and data["title"] is not None:
+            logger.debug("Validating title field")
+
+            if not isinstance(data["title"], str):
+                logger.error("Field 'title' must be a string.")
+                raise AIResponseParserError("Field 'title' must be a string.")
             
-        Returns:
-            A clean, formatted Markdown string report."""
-        sections = [
-            "# 📊 Relatório da IA",
+            if not data["title"].strip():
+                logger.error("Field 'title' cannot be empty.")
+                raise AIResponseParserError("Field 'title' cannot be empty.")
 
-            self._markdown_problem(analysis),
-            self._markdown_viability(analysis),
-            self._markdown_target_audience(analysis),
-            self._markdown_5w2h(analysis),
-            self._markdown_risks(analysis),
-            self._markdown_competitors(analysis),
-            self._markdown_next_steps(analysis),
-        ]
+        # 2. Validate 5W2H (if present in the response)
+        if "fivew2h" in data and data["fivew2h"] is not None:
+            logger.debug("Validating 5W2H fields")
+            self._validate_5w2h(data["fivew2h"])
+
+        # 3. Validate Analysis Object (if present in the response)
+        if "analysis" in data and data["analysis"] is not None:
+            logger.debug("Validating analysis object")
+            self._validate_analysis(data["analysis"])
+
+    def to_markdown(self, analysis: Mapping[str, Any]) -> str:
+        """Converts the analysis dictionary into a formatted Markdown report.
+
+        Args:
+            analysis: Validated dictionary containing the AI analysis object.
+
+        Returns:
+            A clean, formatted Markdown report string.
+        """
+        logger.debug("Generating AI report in Markdown format")
+        if not isinstance(analysis, Mapping):
+            logger.error(
+                "Analysis payload must be a dictionary to convert to markdown"
+            )
+            raise AIResponseParserError("Analysis payload must be a dictionary.")
+        
+        sections = ["# 📊 Relatório da IA"]
+
+        if "problem" in analysis:
+            sections.append(self._markdown_problem(analysis))
+        if "viability" in analysis:
+            sections.append(self._markdown_viability(analysis))
+        if "target_audience" in analysis:
+            sections.append(self._markdown_target_audience(analysis))
+
+        fivew2h = analysis.get("fivew2h", {})
+        if fivew2h:
+            sections.append(self._markdown_5w2h(fivew2h))
+
+        if "risks" in analysis:
+            sections.append(self._markdown_risks(analysis))
+        if "competitors" in analysis:
+            sections.append(self._markdown_competitors(analysis))
+        if "next_steps" in analysis:
+            sections.append(self._markdown_next_steps(analysis))
 
         return "\n\n---\n\n".join(sections)
 
-    def _load_json(self, text: str):
-        if not text:
+    # ==================================================
+    # Validation Helpers
+    # ==================================================
+
+    def _load_json(self, text: str) -> dict[str, Any]:
+        """Load a JSON object, optionally removing a Markdown fence.
+
+        Args:
+            text: Raw model response.
+
+        Returns:
+            Parsed JSON object.
+
+        Raises:
+            AIResponseParserError: If text is empty, invalid JSON, or not an object.
+        """
+        logger.debug("Loading and cleaning JSON response")
+
+        if not text or not text.strip():
+            logger.error("The AI response text cannot be empty.")
             raise AIResponseParserError("The AI response text cannot be empty.")
+
+        cleaned_text = text.strip()
+        if cleaned_text.startswith("```"):
+            lines = cleaned_text.splitlines()
+            if lines[0].strip().lower() in ("```json", "```"):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            cleaned_text = "\n".join(lines).strip()
+
         try:
-            return json.loads(text)
+            return json.loads(cleaned_text)
         except json.JSONDecodeError as exc:
+            logger.exception("The AI response is not a valid JSON")
             raise AIResponseParserError(
                 "The AI response is not a valid JSON."
-                ) from exc
+            ) from exc
 
-    def _validate_structure(self, data: dict):
-        if not isinstance(data, dict):
-            raise AIResponseParserError(
-                "The AI response must be an object."
-            )
+    def _validate_analysis(self, analysis: Mapping[str, Any]) -> None:
+        """Validate structure, types, and constraints for an analysis object.
 
-        for field in self.REQUIRED_FIELDS:
+        Args:
+            analysis: Analysis object returned by the model.
 
-            if field not in data:
+        Raises:
+            AIResponseParserError: If a required field is missing or invalid.
+        """
+        if not isinstance(analysis, dict):
+            logger.error("Field 'analysis' must be an object.")
+            raise AIResponseParserError("Field 'analysis' must be an object.")
 
+        for field, expected_type in self.ANALYSIS_SCHEMA.items():
+            if field not in analysis:
+                logger.error(f"Field '{field}' is missing in analysis.")
+                raise AIResponseParserError(f"Field '{field}' is missing in analysis.")
+
+            value = analysis[field]
+
+            # Prevent boolean values from passing as integers (bool is a subclass of int in Python)
+            if expected_type is int and isinstance(value, bool):
+                logger.error(f"Field '{field}' in analysis must be an integer, not a boolean.")
+                raise AIResponseParserError(f"Field '{field}' in analysis must be an integer, not a boolean.")
+
+            if not isinstance(value, expected_type):
+                logger.error(f"Field '{field}' in analysis must be of type {expected_type.__name__}.")
                 raise AIResponseParserError(
-                    f"The '{field}' field is missing."
+                    f"Field '{field}' in analysis must be of type {expected_type.__name__}."
                 )
 
-            if data[field] is None:
+            # Specific constraints
+            if expected_type is str and not value.strip():
+                logger.error(f"Field '{field}' in analysis cannot be empty.")
+                raise AIResponseParserError(f"Field '{field}' in analysis cannot be empty.")
+
+            if expected_type is int and not (0 <= value <= 10):
+                logger.error("Field '%s' in analysis must be between 0 and 10.", field)
                 raise AIResponseParserError(
-                    f"The '{field}' field is empty."
+                    f"Field '{field}' in analysis must be between 0 and 10."
                 )
 
-    def _validate_types(self, data: dict) -> None:
+            if expected_type is list:
+                if not value:
+                    logger.error(f"Field '{field}' in analysis cannot be an empty list.")
+                    raise AIResponseParserError(f"Field '{field}' in analysis cannot be an empty list.")
+                for item in value:
+                    if not isinstance(item, str) or not item.strip():
+                        logger.error(f"All items in '{field}' list in analysis must be non-empty strings.")
+                        raise AIResponseParserError(
+                            f"All items in '{field}' list in analysis must be non-empty strings."
+                        )
 
-        for field in self.TEXT_FIELDS:
-            value = data[field]
-            if not isinstance(value, str):
-                raise AIResponseParserError(
-                    f"The '{field}' field must be a string."
-                )
+    def _validate_5w2h(self, fivew2h: Mapping[str, Any]) -> None:
+        """Validate all required 5W2H fields.
 
-            if not value.strip():
-                raise AIResponseParserError(
-                    f"The '{field}' field cannot be empty."
-                )
-    def _validate_5w2h(self, fivew2h: dict) -> None:
+        Args:
+            fivew2h: 5W2H object returned by the model.
+
+        Raises:
+            AIResponseParserError: If a field is missing, empty, or not text.
+        """
         if not isinstance(fivew2h, dict):
-            raise AIResponseParserError(
-                "5W2H must be an object."
-            )
+            logger.error("Field 'fivew2h' must be an object.")
+            raise AIResponseParserError("Field 'fivew2h' must be an object.")
+
         for field in self.REQUIRED_5W2H_FIELDS:
             if field not in fivew2h:
-                raise AIResponseParserError(
-                    f"Field '{field}' is missing."
-                )
+                logger.error(f"Field '{field}' is missing in 5W2H.")
+                raise AIResponseParserError(f"Field '{field}' is missing in 5W2H.")
 
-            value = fivew2h[field]
-
+        for field, value in fivew2h.items():
             if not isinstance(value, str):
-                raise AIResponseParserError(
-                    f"Field '{field}' must be a string."
+                logger.error(
+                    "Field '%s' in 5W2H cannot be empty.",
+                    field,
                 )
-
+                raise AIResponseParserError(
+                    f"Field '{field}' in 5W2H cannot be empty."
+                    )
             if not value.strip():
+                logger.error("Field '%s' in 5W2H cannot be empty")
                 raise AIResponseParserError(
-                    f"Field '{field}' cannot be empty."
-                )
+                    f"Field '{field}' in 5W2H cannot be empty."
+                    )
+
+    # ==================================================
+    # Markdown Formatting Helpers
+    # ==================================================
+
+    def _markdown_5w2h(self, fivew2h: Mapping[str, Any]) -> str:
+        """Format 5W2H dictionary into a Markdown table section.
+        
+        Args:
+            fivew2h: Dictionary containing the 5W2H keys directly.
             
-    def _markdown_problem(self, analysis: dict):
-        return f"""
-                ## Problema
-                
-                {analysis["problem"]}
-                """.strip()
+        Returns:
+            str: Formatted Markdown table.
+        """
+        return cleandoc(f"""
+            ## 📋 Planejamento 5W2H
 
-    def _markdown_viability(self, analysis: dict):
-        return f"""
-                ## Viabilidade
-                
-                {analysis["viability"]}
-            """.strip()
+            | Pergunta | Detalhamento |
+            | :--- | :--- |
+            | **What (O quê?)** | {fivew2h.get("what", "N/A")} |
+            | **Why (Por quê?)** | {fivew2h.get("why", "N/A")} |
+            | **Where (Onde?)** | {fivew2h.get("where", "N/A")} |
+            | **When (Quando?)** | {fivew2h.get("when", "N/A")} |
+            | **Who (Quem?)** | {fivew2h.get("who", "N/A")} |
+            | **How (Como?)** | {fivew2h.get("how", "N/A")} |
+            | **How Much (Quanto?)** | {fivew2h.get("how_much", "N/A")} |
+        """)
 
-    def _markdown_target_audience(self, analysis: dict):
-        return f"""
-                ## Público-alvo
-                
-                {analysis["target_audience"]}
-            """.strip()
 
-    def _markdown_5w2h(self, analysis: dict):
+    def _markdown_problem(self, analysis: Mapping[str, Any]) -> str:
+        """Format the problem section.
 
-        fivew2h = analysis["fivew2h"]
+        Args:
+            analysis: Validated analysis data.
 
-        return f"""
-                ## 5W2H
-                
-                ### What (O Quê)
-                {fivew2h["what"]}
-                
-                ### Why (Por Quê)
-                {fivew2h["why"]}
+        Returns:
+            Markdown problem section.
+        """
+        return cleandoc(f"""
+            ## Problema
 
-                ### Where (Onde)
-                {fivew2h["where"]}
+            {analysis['problem']}
+        """)
 
-                ### When (Quando)
-                {fivew2h["when"]}
+    def _markdown_viability(self, analysis: Mapping[str, Any]) -> str:
+        """Format the viability section.
 
-                ### Who
-                {fivew2h["who"]}
+        Args:
+            analysis: Validated analysis data.
 
-                ### How (Como)
-                {fivew2h["how"]}
+        Returns:
+            Markdown viability section.
+        """
+        return cleandoc(f"""
+            ## Viabilidade
 
-                ### How Much (Quanto)
-                {fivew2h["how_much"]}
-                """.strip()
-    
-    def _markdown_risks(self, analysis: dict):
-        return f"""
-                ## Riscos
-                
-                {analysis["risks"]}
-            """.strip()
-    
-    def _markdown_competitors(self, analysis: dict):
-        return f"""
-                ## Concorrentes
-                
-                {analysis["competitors"]}
-            """.strip()
+            **Pontuação:** {analysis['viability']}/10
+        """)
 
-    def _markdown_next_steps(self, analysis: dict):
-        return f"""
-                ## Próximos Passos
-                
-                {analysis["next_steps"]}
-            """.strip()
+    def _markdown_target_audience(self, analysis: Mapping[str, Any]) -> str:
+        """Format the target-audience section.
+
+        Args:
+            analysis: Validated analysis data.
+
+        Returns:
+            Markdown target-audience section.
+        """
+        return cleandoc(f"""
+            ## Público-alvo
+
+            {analysis['target_audience']}
+        """)
+
+    def _markdown_risks(self, analysis: Mapping[str, Any]) -> str:
+        """Format the risks section.
+
+        Args:
+            analysis: Validated analysis data.
+
+        Returns:
+            Markdown risks section.
+        """
+        items = "\n".join(
+            f"- {risk}"
+            for risk in analysis["risks"]
+        )
+        return f"## Riscos\n\n{items}"
+
+    def _markdown_competitors(self, analysis: Mapping[str, Any]) -> str:
+        """Format the competitors section.
+
+        Args:
+            analysis: Validated analysis data.
+
+        Returns:
+            Markdown competitors section.
+        """
+        items = "\n".join(
+            f"- {competitor}"
+            for competitor in analysis["competitors"]
+        )
+        return f"## Concorrentes\n\n{items}"
+
+    def _markdown_next_steps(self, analysis: Mapping[str, Any]) -> str:
+        """Format the next-steps section.
+
+        Args:
+            analysis: Validated analysis data.
+
+        Returns:
+            Markdown next-steps section.
+        """
+        items = "\n".join(f"- {step}" for step in analysis["next_steps"])
+        return f"## Próximos Passos\n\n{items}"
