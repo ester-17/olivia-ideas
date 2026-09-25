@@ -87,7 +87,6 @@ Essa validação complementa o `ENUM` do banco e identifica violações de contr
 │ FK user_id      │
 │ title           │
 │ description     │
-│ category        │
 │ status          │
 │ created_at      │
 │ updated_at      │
